@@ -69,11 +69,11 @@ except ImportError:
 DEFAULT_PARAMS = {
     'min_points': 12,
     'sg_window': 9,
-    'percentile': 90,  # Increased from 80 to reduce false segmentation (less sensitive)
+    'percentile': 96,  # Increased from 90 to 96 to reduce false segmentation in smooth curves (less sensitive)
     'variance_threshold': 0.14,  # Tuned to 0.14 for optimal balance (was 0.12, causing over-segmentation)
     'transition_buffer': 2.5,
     'hermite_tension': 0.6,
-    'merge_threshold': 0.05,
+    'merge_threshold': 0.12,  # Increased from 0.05 to 0.12 for aggressive segment merging
     'angular_resolution': 48,
     'maxfev': 4000,
     'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - SWITCHED TO IMPROVED for better sphere cap detection
@@ -831,16 +831,40 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
         # === SELECT BEST FIT ===
         if fit_results:
-            # Sort by error (lowest first)
-            fit_results.sort(key=lambda x: x[2])
-            best_shape, best_params, best_error = fit_results[0]
+            # Apply shape complexity penalties for preference of simpler models
+            # This helps avoid over-fitting with flexible shapes (frustum, cone)
+            adjusted_results = []
+            for shape_name, params, error_pct in fit_results:
+                adjusted_error = error_pct
+
+                # Shape complexity penalty (prefer simpler shapes):
+                # cylinder: 0 parameters (simplest)
+                # cone: 2 parameters
+                # sphere_cap: 1 parameter
+                # frustum: 3 parameters (most complex)
+
+                # If error is within reasonable range and simpler shapes exist,
+                # apply small penalty to complex shapes
+                if shape_name == 'frustum' and error_pct < 3.0:
+                    # Penalize frustum slightly if fit is already good
+                    # But only when it's not clearly better than alternatives
+                    adjusted_error += 0.5  # Small penalty for model complexity
+                elif shape_name == 'cone' and error_pct < 3.0:
+                    adjusted_error += 0.2  # Smaller penalty for cone (less complex than frustum)
+
+                adjusted_results.append((shape_name, params, error_pct, adjusted_error))
+
+            # Sort by adjusted error (lowest first)
+            adjusted_results.sort(key=lambda x: x[3])
+            best_shape, best_params, best_error, _ = adjusted_results[0]
 
             # DEBUG: Show fit comparisons if requested
             if DEFAULT_PARAMS.get('debug_transitions', False):
                 logger.debug(f"\nSegment {i} ({start}-{end}): Fit comparison:")
-                for shape_name, _, error_pct in fit_results:
+                for shape_name, _, error_pct, adj_error in adjusted_results:
                     marker = "✓ SELECTED" if shape_name == best_shape else ""
-                    logger.debug(f"  {shape_name:<15} error: {error_pct:6.2f}% {marker}")
+                    penalty_str = f" (adj: {adj_error:.2f}%)" if adj_error != error_pct else ""
+                    logger.debug(f"  {shape_name:<15} error: {error_pct:6.2f}%{penalty_str} {marker}")
 
             # === CYLINDER PREFERENCE FIX ===
             # If frustum is selected but r1 ≈ r2, prefer simpler cylinder model
@@ -891,11 +915,12 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             fit_errors.append(0.0)
             logger.warning(f"Segment {i}: All fits failed, using fallback cylinder")
     
+
     if verbose:
         logger.info(f"✅ Detected {len(segments)} segments")
         if fit_errors:
             logger.info(f"   Average fit error: {np.mean(fit_errors):.3f}%")
-    
+
     if job:
         job.complete_step('Segmentation & Fitting', time.time() - step_start)
         job.statistics['segments_count'] = len(segments)
