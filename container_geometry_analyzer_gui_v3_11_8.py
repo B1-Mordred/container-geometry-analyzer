@@ -75,9 +75,10 @@ DEFAULT_PARAMS = {
     'merge_threshold': 0.05,
     'angular_resolution': 48,
     'maxfev': 4000,
-    'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative)
-    'use_adaptive_threshold': True,
+    'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - USING IMPROVED
+    'use_adaptive_threshold': True,  # Adaptive SNR-based thresholds
     'use_multiscale': False,  # More thorough but slower
+    'use_local_regression': True,  # Local polynomial regression for area computation
 }
 
 GEOMETRIC_CONSTRAINTS = {
@@ -198,6 +199,54 @@ def volume_frustum(h, r1, r2, H):
     r_interpolated = r1 + (r2 - r1) * (h / H)
     return (np.pi * h / 3) * (r1**2 + r_interpolated**2 + r1 * r_interpolated)
 
+def volume_cone(h, r_base, H):
+    """
+    Cone volume: V = (πh/3)r²(h/H)²
+
+    Parameters:
+    -----------
+    h : float or array
+        Height from apex (where r=0)
+    r_base : float
+        Radius at base (height H)
+    H : float
+        Total height of cone
+
+    Returns:
+    --------
+    Volume from apex to height h
+    """
+    if H == 0:
+        return np.zeros_like(h) if isinstance(h, np.ndarray) else 0
+    # Radius at height h: r(h) = r_base * (h/H)
+    r_h = r_base * (h / H)
+    # Volume of cone from apex to h
+    return (np.pi / 3) * h * r_h**2
+
+def volume_sphere_cap(h, R):
+    """
+    Spherical cap volume: V = πh²(3R - h)/3
+
+    Parameters:
+    -----------
+    h : float or array
+        Height of cap from bottom
+    R : float
+        Radius of sphere
+
+    Returns:
+    --------
+    Volume of spherical cap
+
+    Notes:
+    ------
+    Valid for h ≤ 2R (hemisphere or less)
+    For h > 2R, returns full sphere volume
+    """
+    # Clamp to valid range
+    h_clamped = np.minimum(h, 2*R) if isinstance(h, np.ndarray) else min(h, 2*R)
+    return (np.pi * h_clamped**2 * (3*R - h_clamped)) / 3
+
 def load_data_csv(csv_path, job: AnalysisJob = None, verbose=True):
     """Load and validate CSV data with enhanced error handling."""
     step_start = time.time()
@@ -256,39 +305,127 @@ def load_data_csv(csv_path, job: AnalysisJob = None, verbose=True):
         logger.error(f"Error loading CSV '{csv_path}': {str(e)}")
         raise RuntimeError(f"Error loading CSV '{csv_path}': {str(e)}")
 
-def compute_areas(df, job: AnalysisJob = None, min_dv=None, verbose=True):
-    """Calculate cross-sectional areas from volume-height data."""
+def compute_areas(df, job: AnalysisJob = None, min_dv=None, verbose=True, use_local_regression=True):
+    """
+    Calculate cross-sectional areas from volume-height data.
+
+    Uses local polynomial regression for robustness to noise.
+
+    Parameters:
+    -----------
+    df : DataFrame
+        Must contain 'Height_mm' and 'Volume_mm3' columns
+    job : AnalysisJob, optional
+        Job tracking object
+    min_dv : float, optional
+        Minimum differential volume threshold
+    verbose : bool
+        Print progress information
+    use_local_regression : bool
+        If True, use local regression (more robust)
+        If False, use simple point-to-point differences (legacy)
+
+    Returns:
+    --------
+    DataFrame with 'Area', 'Height_mm', 'MidHeight' columns
+    """
     step_start = time.time()
-    
+
     if min_dv is None:
         min_dv = GEOMETRIC_CONSTRAINTS['min_differential_volume']
-    
+
     df = df.copy()
-    
-    df['dV'] = df['Volume_mm3'].diff().fillna(0)
-    df['dh'] = df['Height_mm'].diff().fillna(0.1)
-    
-    df['dV'] = np.maximum(df['dV'], min_dv)
-    df['dh'] = np.maximum(df['dh'], 0.01)
-    
-    df['Area'] = df['dV'] / df['dh']
-    df['Area'] = np.maximum(df['Area'], min_dv)
-    
-    df['MidHeight'] = (df['Height_mm'] + df['Height_mm'].shift(1).fillna(df['Height_mm'])) / 2
-    
-    df_areas = df.iloc[1:].reset_index(drop=True)
-    
-    if verbose:
-        logger.info(f"📐 Areas computed: {len(df_areas)} points")
-        logger.info(f"   Mean: {df_areas['Area'].mean():.1f} ± {df_areas['Area'].std():.1f} mm²")
-    
+    heights = df['Height_mm'].values
+    volumes = df['Volume_mm3'].values
+    n = len(heights)
+
+    if use_local_regression and n >= 5:
+        # === IMPROVED: Local polynomial regression ===
+        # More robust to noise and irregular sampling
+
+        # Adaptive window size based on data density
+        window = min(9, max(5, n // 10))
+        if window % 2 == 0:
+            window += 1
+
+        areas = np.zeros(n)
+
+        for i in range(n):
+            # Define local window
+            half_win = window // 2
+            i_start = max(0, i - half_win)
+            i_end = min(n, i + half_win + 1)
+
+            # Get local data
+            h_local = heights[i_start:i_end]
+            v_local = volumes[i_start:i_end]
+
+            # Fit local linear model: V(h) = a*h + b
+            # The derivative dV/dh = a (constant slope)
+            try:
+                if len(h_local) >= 2:
+                    coeffs = np.polyfit(h_local, v_local, deg=1)
+                    dV_dh = coeffs[0]  # Slope = dV/dh
+
+                    # Area = dV/dh (for axisymmetric bodies)
+                    areas[i] = max(dV_dh, min_dv)
+                else:
+                    # Fallback for edge cases
+                    areas[i] = min_dv
+            except (np.linalg.LinAlgError, ValueError):
+                # If fit fails, use fallback
+                if i > 0:
+                    dV = volumes[i] - volumes[i-1]
+                    dh = heights[i] - heights[i-1]
+                    areas[i] = max(dV / (dh + 1e-6), min_dv)
+                else:
+                    areas[i] = min_dv
+
+        # Apply median filter to remove any remaining outliers
+        from scipy.ndimage import median_filter
+        areas = median_filter(areas, size=3)
+
+        df['Area'] = areas
+        df['MidHeight'] = heights
+        df['dV'] = np.diff(volumes, prepend=0)
+        df['dh'] = np.diff(heights, prepend=0.1)
+
+        if verbose:
+            logger.info(f"📐 Areas computed (local regression): {len(df)} points")
+            logger.info(f"   Method: Polynomial regression (window={window})")
+            logger.info(f"   Mean: {df['Area'].mean():.1f} ± {df['Area'].std():.1f} mm²")
+
+    else:
+        # === LEGACY: Simple point-to-point differences ===
+        df['dV'] = df['Volume_mm3'].diff().fillna(0)
+        df['dh'] = df['Height_mm'].diff().fillna(0.1)
+
+        df['dV'] = np.maximum(df['dV'], min_dv)
+        df['dh'] = np.maximum(df['dh'], 0.01)
+
+        df['Area'] = df['dV'] / df['dh']
+        df['Area'] = np.maximum(df['Area'], min_dv)
+
+        df['MidHeight'] = (df['Height_mm'] + df['Height_mm'].shift(1).fillna(df['Height_mm'])) / 2
+
+        if verbose:
+            logger.info(f"📐 Areas computed (legacy): {len(df)} points")
+            logger.info(f"   Mean: {df['Area'].mean():.1f} ± {df['Area'].std():.1f} mm²")
+
+    # Skip first row if using legacy method
+    if not use_local_regression:
+        df_areas = df.iloc[1:].reset_index(drop=True)
+    else:
+        df_areas = df.reset_index(drop=True)
+
     if job:
         job.complete_step('Area Computation', time.time() - step_start)
         job.statistics['area_mean'] = float(df_areas['Area'].mean())
         job.statistics['area_std'] = float(df_areas['Area'].std())
         job.statistics['area_min'] = float(df_areas['Area'].min())
         job.statistics['area_max'] = float(df_areas['Area'].max())
-    
+        job.statistics['area_method'] = 'local_regression' if use_local_regression else 'point_to_point'
+
     return df_areas
 
 def find_optimal_transitions(area, min_points=12, percentile=80, variance_threshold=0.15, verbose=False):
@@ -557,55 +694,103 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
         height_span = float(x[-1] - x[0])
         mean_area = float(np.median(area[start:end + 1]))
         guess_r = float(np.sqrt(mean_area / np.pi))
-        
+
+        # Prepare to test all shape types
+        fit_results = []  # List of (shape_name, params, error_pct)
+
+        # === 1. TRY CYLINDER FIT ===
         try:
             bounds_lower = GEOMETRIC_CONSTRAINTS['fit_bounds_lower'] * guess_r
             bounds_upper = GEOMETRIC_CONSTRAINTS['fit_bounds_upper'] * guess_r
-            popt_cyl, _ = curve_fit(volume_cylinder, x - x[0], y - y[0], 
-                                  p0=[guess_r], bounds=([bounds_lower], [bounds_upper]), 
+            popt_cyl, _ = curve_fit(volume_cylinder, x - x[0], y - y[0],
+                                  p0=[guess_r], bounds=([bounds_lower], [bounds_upper]),
                                   maxfev=DEFAULT_PARAMS['maxfev'])
             cyl_error = np.mean(np.abs(volume_cylinder(x - x[0], *popt_cyl) + y[0] - y))
             cyl_error_pct = (cyl_error / (y[-1] + 1e-6)) * 100
+            fit_results.append(('cylinder', [popt_cyl[0]], cyl_error_pct))
+            logger.debug(f"Segment {i}: Cylinder fit error = {cyl_error_pct:.2f}%")
         except Exception as e:
             logger.debug(f"Cylinder fit failed for segment {i}: {e}")
-            popt_cyl = None
-            cyl_error = np.inf
-            cyl_error_pct = np.inf
-        
+
+        # === 2. TRY FRUSTUM FIT ===
         try:
-            area_start = area[start] if start > 0 else mean_area
-            area_end = area[end] if end < len(area) - 1 else mean_area
+            area_start = area[start] if start < len(area) else mean_area
+            area_end = area[min(end, len(area)-1)]
             r1_guess = float(np.sqrt(area_start / np.pi))
             r2_guess = float(np.sqrt(area_end / np.pi))
-            
+
             bounds = (
-                [GEOMETRIC_CONSTRAINTS['fit_bounds_lower']*r1_guess, 
-                 GEOMETRIC_CONSTRAINTS['fit_bounds_lower']*r2_guess, 
+                [GEOMETRIC_CONSTRAINTS['fit_bounds_lower']*r1_guess,
+                 GEOMETRIC_CONSTRAINTS['fit_bounds_lower']*r2_guess,
                  0.8*height_span],
-                [GEOMETRIC_CONSTRAINTS['fit_bounds_upper']*r1_guess, 
-                 GEOMETRIC_CONSTRAINTS['fit_bounds_upper']*r2_guess, 
+                [GEOMETRIC_CONSTRAINTS['fit_bounds_upper']*r1_guess,
+                 GEOMETRIC_CONSTRAINTS['fit_bounds_upper']*r2_guess,
                  1.2*height_span]
             )
-            popt_frust, _ = curve_fit(volume_frustum, x - x[0], y - y[0], 
-                                    p0=[r1_guess, r2_guess, height_span], 
+            popt_frust, _ = curve_fit(volume_frustum, x - x[0], y - y[0],
+                                    p0=[r1_guess, r2_guess, height_span],
                                     bounds=bounds, maxfev=DEFAULT_PARAMS['maxfev'])
             frust_error = np.mean(np.abs(volume_frustum(x - x[0], *popt_frust) + y[0] - y))
             frust_error_pct = (frust_error / (y[-1] + 1e-6)) * 100
+            fit_results.append(('frustum', popt_frust, frust_error_pct))
+            logger.debug(f"Segment {i}: Frustum fit error = {frust_error_pct:.2f}%")
         except Exception as e:
             logger.debug(f"Frustum fit failed for segment {i}: {e}")
-            popt_frust = None
-            frust_error = np.inf
-            frust_error_pct = np.inf
-        
-        if popt_cyl is not None and (popt_frust is None or cyl_error < frust_error):
-            segments.append((start, end, 'cylinder', [popt_cyl[0]]))
-            fit_errors.append(cyl_error_pct)
-        elif popt_frust is not None:
-            segments.append((start, end, 'frustum', popt_frust))
-            fit_errors.append(frust_error_pct)
+
+        # === 3. TRY CONE FIT ===
+        # Cone: starts from r=0 at apex
+        try:
+            # Guess: r_base from final area
+            area_end = area[min(end, len(area)-1)]
+            r_base_guess = float(np.sqrt(area_end / np.pi))
+
+            popt_cone, _ = curve_fit(volume_cone, x - x[0], y - y[0],
+                                    p0=[r_base_guess, height_span],
+                                    bounds=([0.1*r_base_guess, 0.5*height_span],
+                                           [5*r_base_guess, 2*height_span]),
+                                    maxfev=DEFAULT_PARAMS['maxfev'])
+            cone_error = np.mean(np.abs(volume_cone(x - x[0], *popt_cone) + y[0] - y))
+            cone_error_pct = (cone_error / (y[-1] + 1e-6)) * 100
+            fit_results.append(('cone', popt_cone, cone_error_pct))
+            logger.debug(f"Segment {i}: Cone fit error = {cone_error_pct:.2f}%")
+        except Exception as e:
+            logger.debug(f"Cone fit failed for segment {i}: {e}")
+
+        # === 4. TRY SPHERE CAP FIT ===
+        # Sphere cap: common for rounded bottoms
+        try:
+            # Guess: R ~ 1.5 * max radius in segment
+            max_area = np.max(area[start:min(end+1, len(area))])
+            r_max = np.sqrt(max_area / np.pi)
+            R_guess = 1.5 * r_max  # Sphere larger than cap
+
+            popt_sphere, _ = curve_fit(volume_sphere_cap, x - x[0], y - y[0],
+                                      p0=[R_guess],
+                                      bounds=([0.5*R_guess], [10*R_guess]),
+                                      maxfev=DEFAULT_PARAMS['maxfev'])
+            sphere_error = np.mean(np.abs(volume_sphere_cap(x - x[0], *popt_sphere) + y[0] - y))
+            sphere_error_pct = (sphere_error / (y[-1] + 1e-6)) * 100
+            fit_results.append(('sphere_cap', popt_sphere, sphere_error_pct))
+            logger.debug(f"Segment {i}: Sphere cap fit error = {sphere_error_pct:.2f}%")
+        except Exception as e:
+            logger.debug(f"Sphere cap fit failed for segment {i}: {e}")
+
+        # === SELECT BEST FIT ===
+        if fit_results:
+            # Sort by error (lowest first)
+            fit_results.sort(key=lambda x: x[2])
+            best_shape, best_params, best_error = fit_results[0]
+
+            segments.append((start, end, best_shape, best_params))
+            fit_errors.append(best_error)
+
+            if verbose and len(fit_results) > 1:
+                logger.debug(f"Segment {i}: Best fit = {best_shape} ({best_error:.2f}% error)")
         else:
+            # Fallback: use cylinder with guessed radius
             segments.append((start, end, 'cylinder', [guess_r]))
             fit_errors.append(0.0)
+            logger.warning(f"Segment {i}: All fits failed, using fallback cylinder")
     
     if verbose:
         logger.info(f"✅ Detected {len(segments)} segments")
@@ -676,15 +861,44 @@ def create_enhanced_profile(segments, df_areas, job: AnalysisJob = None, transit
         h_rel = np.linspace(0, h_span, num_points)
         
         if shape == 'cylinder' and len(params) == 1:
+            # Cylinder: constant radius
             r_start, r_end = float(params[0]), float(params[0])
             slope_end = 0.0
             r_seg = np.full_like(h_rel, r_start)
+
         elif shape == 'frustum' and len(params) >= 3:
+            # Frustum: linear taper from r1 to r2
             r1, r2, _ = [float(p) for p in params]
             t = h_rel / h_span
             r_seg = r1 + (r2 - r1) * t
             slope_end = (r2 - r1) / h_span
+
+        elif shape == 'cone' and len(params) >= 2:
+            # Cone: starts from apex (r=0) and expands linearly
+            r_base, H = [float(p) for p in params]
+            # r(h) = r_base * (h/H)
+            r_seg = r_base * (h_rel / H)
+            # Derivative: dr/dh = r_base/H (constant)
+            slope_end = r_base / H
+
+        elif shape == 'sphere_cap' and len(params) >= 1:
+            # Sphere cap: curved profile
+            R = float(params[0])  # Sphere radius
+
+            # For sphere cap, r(h) = sqrt(2Rh - h²)
+            # This gives the radius at height h from the bottom
+            r_seg = np.sqrt(np.maximum(2*R*h_rel - h_rel**2, 0.01))
+
+            # Derivative at end: dr/dh = (R - h) / sqrt(2Rh - h²)
+            h_end_rel = h_rel[-1]
+            r_end_val = r_seg[-1]
+            if r_end_val > 0.01:
+                slope_end = (R - h_end_rel) / r_end_val
+            else:
+                slope_end = 0.0
+
         else:
+            # Fallback: linear interpolation between start and end radii
             r_start = np.sqrt(df_areas.iloc[start]['Area'] / np.pi)
             r_end = np.sqrt(df_areas.iloc[min(end, len(df_areas)-1)]['Area'] / np.pi)
             r_seg = r_start + (r_end - r_start) * (h_rel / h_span)
@@ -698,13 +912,37 @@ def create_enhanced_profile(segments, df_areas, job: AnalysisJob = None, transit
             next_start, next_end, next_shape, next_params = segments[i+1]
             next_h_start = df_areas.iloc[next_start]['Height_mm']
             
+            # Determine starting radius and slope of next segment
             if next_shape == 'cylinder' and len(next_params) == 1:
                 next_r_start = float(next_params[0])
                 next_slope = 0.0
+
             elif next_shape == 'frustum' and len(next_params) >= 3:
                 next_r_start = float(next_params[0])
-                next_slope = (next_params[1] - next_params[0]) / (df_areas.iloc[next_end]['Height_mm'] - df_areas.iloc[next_start]['Height_mm'])
+                next_h_span = df_areas.iloc[next_end]['Height_mm'] - df_areas.iloc[next_start]['Height_mm']
+                if next_h_span > 0:
+                    next_slope = (next_params[1] - next_params[0]) / next_h_span
+                else:
+                    next_slope = 0.0
+
+            elif next_shape == 'cone' and len(next_params) >= 2:
+                # Cone starts from r=0, so r at start position is determined by position
+                r_base, H = [float(p) for p in next_params]
+                # At the beginning of the cone segment, we're at height 0 relative to apex
+                next_r_start = 0.01  # Small value (apex)
+                next_slope = r_base / H if H > 0 else 0.0
+
+            elif next_shape == 'sphere_cap' and len(next_params) >= 1:
+                R = float(next_params[0])
+                # At h=0 (bottom of sphere cap), r should be small
+                next_r_start = 0.01  # Bottom of sphere
+                # Slope at h=0: dr/dh = sqrt(2R*0 - 0) → undefined, use finite difference
+                h_small = 0.1
+                next_r_start = np.sqrt(max(2*R*h_small - h_small**2, 0.01))
+                next_slope = (R - h_small) / next_r_start if next_r_start > 0 else 0.0
+
             else:
+                # Fallback
                 next_r_start = np.sqrt(df_areas.iloc[next_start]['Area'] / np.pi)
                 next_slope = 0.0
             
