@@ -914,7 +914,100 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             segments.append((start, end, 'cylinder', [guess_r]))
             fit_errors.append(0.0)
             logger.warning(f"Segment {i}: All fits failed, using fallback cylinder")
-    
+
+    # === POST-PROCESSING: Intelligent segment merging ===
+    # Merge adjacent frustum segments that are geometrically consistent
+    # This reduces over-segmentation in linear regions
+    merged_segments = []
+    skip_indices = set()
+
+    for i in range(len(segments)):
+        if i in skip_indices:
+            continue
+
+        current_start, current_end, current_shape, current_params = segments[i]
+        merge_count = 0
+
+        # Try to merge with adjacent segments of same shape
+        while i + merge_count + 1 < len(segments):
+            next_start, next_end, next_shape, next_params = segments[i + merge_count + 1]
+
+            # Only merge if same shape and adjacent
+            if next_shape != current_shape or next_start > current_end + 1:
+                break
+
+            # Never merge sphere_cap with other shapes - it's a distinct boundary
+            if current_shape == 'sphere_cap' or next_shape == 'sphere_cap':
+                break
+
+            # For frustums, check if radius progression is continuous
+            if current_shape == 'frustum' and len(current_params) >= 2 and len(next_params) >= 2:
+                # current frustum: (r1_current, r2_current, h_current)
+                # next frustum: (r1_next, r2_next, h_next)
+                r2_current = float(current_params[1])
+                r1_next = float(next_params[0])
+
+                # If ending radius of current ≈ starting radius of next, they're continuous
+                radius_diff = abs(r2_current - r1_next) / (max(r2_current, r1_next) + 1e-6)
+
+                if radius_diff < 0.1:  # Within 10% - consider them continuous
+                    # Merge: extend current segment to include next
+                    current_end = next_end
+                    # Update params to reflect merged segment
+                    # Keep first radius, use last radius, extend height
+                    if len(current_params) >= 2 and len(next_params) >= 2:
+                        r1 = float(current_params[0])
+                        r2 = float(next_params[1])
+                        h = current_end - current_start
+                        current_params = [r1, r2, h]
+
+                    merge_count += 1
+                    skip_indices.add(i + merge_count)
+
+                    if verbose:
+                        logger.debug(f"Merging segment {i} and {i+merge_count} (adjacent frustums, continuous radius)")
+                    continue
+
+            # For cylinders, check if radius is the same
+            elif current_shape == 'cylinder' and len(current_params) >= 1 and len(next_params) >= 1:
+                r_current = float(current_params[0])
+                r_next = float(next_params[0])
+
+                radius_diff = abs(r_current - r_next) / (max(r_current, r_next) + 1e-6)
+
+                if radius_diff < 0.05:  # Within 5% - consider same cylinder
+                    current_end = next_end
+                    merge_count += 1
+                    skip_indices.add(i + merge_count)
+
+                    if verbose:
+                        logger.debug(f"Merging segment {i} and {i+merge_count} (adjacent cylinders, same radius)")
+                    continue
+
+            # For cones, check if apex radius matches
+            elif current_shape == 'cone' and len(current_params) >= 1 and len(next_params) >= 1:
+                r_current = float(current_params[0])
+                r_next = float(next_params[0])
+
+                radius_diff = abs(r_current - r_next) / (max(r_current, r_next) + 1e-6)
+
+                if radius_diff < 0.1:  # Within 10%
+                    current_end = next_end
+                    merge_count += 1
+                    skip_indices.add(i + merge_count)
+
+                    if verbose:
+                        logger.debug(f"Merging segment {i} and {i+merge_count} (adjacent cones, similar apex)")
+                    continue
+
+            break
+
+        merged_segments.append((current_start, current_end, current_shape, current_params))
+
+    if verbose and len(merged_segments) < len(segments):
+        logger.info(f"Post-processing: Merged {len(segments)} → {len(merged_segments)} segments")
+
+    segments = merged_segments
 
     if verbose:
         logger.info(f"✅ Detected {len(segments)} segments")
