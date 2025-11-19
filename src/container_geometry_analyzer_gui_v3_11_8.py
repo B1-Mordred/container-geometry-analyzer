@@ -152,6 +152,226 @@ def get_adaptive_params(diameter_mm: float) -> Dict:
 
     return params
 
+# ============================================================================
+# Priority 2: Curved Surface Detection - Curvature Analysis Functions
+# ============================================================================
+
+def compute_curvature(area: np.ndarray, heights: np.ndarray = None) -> np.ndarray:
+    """
+    Compute curvature coefficient for area profile.
+
+    Curvature quantifies how "curved" a surface is:
+    - High curvature (>0.1): Curved surface (hemisphere, sphere cap)
+    - Low curvature (<0.05): Linear surface (cylinder, frustum, cone)
+
+    Formula: κ = |d²A/dh²| / (1 + |dA/dh|)^1.5
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values (if None, uses indices)
+
+    Returns:
+        Curvature coefficient for each point
+    """
+    if heights is None:
+        heights = np.arange(len(area), dtype=float)
+
+    # Compute derivatives
+    first_deriv = np.gradient(area, heights)
+    second_deriv = np.gradient(first_deriv, heights)
+
+    # Compute curvature coefficient
+    # Normalize by (1 + |derivative|)^1.5 to reduce noise sensitivity
+    numerator = np.abs(second_deriv)
+    denominator = 1.0 + np.abs(first_deriv)**1.5
+
+    curvature = numerator / denominator
+
+    return curvature
+
+
+def detect_curved_region(area: np.ndarray, heights: np.ndarray = None,
+                         curvature_threshold: float = 0.08) -> bool:
+    """
+    Detect if area profile has significant curved regions.
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values
+        curvature_threshold: Threshold for detecting curvature
+
+    Returns:
+        True if curved regions detected, False if linear
+    """
+    curvature = compute_curvature(area, heights)
+
+    # Check if maximum curvature exceeds threshold
+    max_curvature = np.max(curvature)
+
+    return max_curvature > curvature_threshold
+
+
+def detect_hemisphere_signature(area: np.ndarray, heights: np.ndarray = None) -> bool:
+    """
+    Detect if data matches hemisphere profile.
+
+    Hemisphere characteristics:
+    - Area starts at maximum (π*R²)
+    - Area decreases monotonically with height
+    - Smooth, continuous curvature
+    - Reaches small area at top
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values
+
+    Returns:
+        True if hemisphere signature detected
+    """
+    if len(area) < 5:
+        return False
+
+    # Check 1: Area decreases monotonically
+    diffs = np.diff(area)
+    is_decreasing = np.all(diffs <= 0)
+
+    if not is_decreasing:
+        return False
+
+    # Check 2: Initial area close to maximum
+    area_range = np.max(area) - np.min(area)
+    area_at_start = area[0]
+    area_ratio = area_at_start / (np.max(area) + 1e-8)
+
+    if area_ratio < 0.90:  # Area should start near max
+        return False
+
+    # Check 3: Area decrease is smooth (high curvature)
+    curvature = compute_curvature(area, heights)
+    mean_curvature = np.mean(curvature)
+
+    if mean_curvature < 0.05:  # Should have curvature
+        return False
+
+    # Check 4: Final area is much smaller than initial
+    if len(area) > 1:
+        area_drop = area[0] - area[-1]
+        area_drop_ratio = area_drop / (area[0] + 1e-8)
+
+        if area_drop_ratio < 0.3:  # Should drop significantly
+            return False
+
+    return True
+
+
+def detect_sphere_cap_signature(area: np.ndarray, heights: np.ndarray = None) -> bool:
+    """
+    Detect if data matches sphere cap profile.
+
+    Sphere cap characteristics:
+    - Area starts at zero (apex)
+    - Area increases monotonically with height
+    - Curvature inflection point in middle
+    - Different profile from hemisphere
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values
+
+    Returns:
+        True if sphere cap signature detected
+    """
+    if len(area) < 5:
+        return False
+
+    # Check 1: Area increases monotonically from near-zero
+    diffs = np.diff(area)
+    is_increasing = np.all(diffs >= 0)
+
+    if not is_increasing:
+        return False
+
+    # Check 2: Area starts near zero
+    area_range = np.max(area) - np.min(area)
+    area_at_start = area[0]
+    area_min_ratio = area_at_start / (np.max(area) + 1e-8)
+
+    if area_min_ratio > 0.05:  # Should start near zero
+        return False
+
+    # Check 3: Curvature pattern (acceleration changes)
+    first_deriv = np.gradient(area, heights if heights is not None else np.arange(len(area)))
+    second_deriv = np.gradient(first_deriv)
+
+    # For sphere cap: d²A/dh² changes sign (inflection)
+    # Initially positive (dA/dh increasing), then negative (dA/dh decreasing)
+    sign_changes = np.sum(np.diff(np.sign(second_deriv)) != 0)
+
+    if sign_changes < 1:  # Should have at least one inflection
+        return False
+
+    # Check 4: Area ratio at endpoints
+    if len(area) > 1:
+        area_ratio_final = area[-1] / (np.max(area) + 1e-8)
+        if area_ratio_final < 0.5:  # Final area should be significant
+            return False
+
+    return True
+
+
+def filter_transitions_in_curves(transitions: List[int], area: np.ndarray,
+                                  heights: np.ndarray = None,
+                                  curvature_threshold: float = 0.10) -> List[int]:
+    """
+    Remove transitions that occur in smooth (curved) regions.
+
+    Strategy: Keep transitions only at boundaries between curved and linear regions.
+    Remove transitions within smooth regions (inflection-induced).
+
+    Args:
+        transitions: Candidate transition indices
+        area: Cross-sectional areas
+        heights: Height values
+        curvature_threshold: Threshold for identifying curved regions
+
+    Returns:
+        Filtered transition indices
+    """
+    if len(transitions) < 2:
+        return transitions
+
+    # Compute curvature for full data
+    curvature = compute_curvature(area, heights)
+
+    # Identify smooth (curved) regions: curvature > threshold
+    smooth_mask = curvature > curvature_threshold
+
+    # Filter transitions
+    filtered = []
+
+    for i, t in enumerate(transitions):
+        if t <= 0 or t >= len(area) - 1:
+            # Keep start and end transitions
+            filtered.append(t)
+            continue
+
+        # Check if transition is at smooth→linear boundary
+        if i == 0 or i == len(transitions) - 1:
+            # Always keep first and last
+            filtered.append(t)
+        else:
+            # Check neighborhood of transition
+            left_curved = smooth_mask[t - 1] if t > 0 else False
+            right_curved = smooth_mask[t] if t < len(smooth_mask) else False
+
+            # Keep transition if it's at boundary (one side curved, other linear)
+            if left_curved != right_curved:
+                filtered.append(t)
+            # Else: inside curved region, skip this transition
+
+    return filtered
+
+
 # Job tracking class
 class AnalysisJob:
     """Track analysis job execution details for reporting."""
@@ -340,6 +560,154 @@ def volume_sphere_cap(h, R):
     # Clamp to valid range
     h_clamped = np.minimum(h, 2*R) if isinstance(h, np.ndarray) else min(h, 2*R)
     return (np.pi * h_clamped**2 * (3*R - h_clamped)) / 3
+
+
+# ============================================================================
+# Priority 2: Hemisphere and Specialized Fitting Functions
+# ============================================================================
+
+def volume_hemisphere(h, R):
+    """
+    Hemisphere volume: V = (2/3)πR³ × (3h/R - h³/R³)
+
+    This is equivalent to a sphere cap where cap height = R.
+
+    Parameters:
+    -----------
+    h : float or array
+        Height of fill from bottom (0 to R)
+    R : float
+        Radius of hemisphere
+
+    Returns:
+    --------
+    Volume of filled hemisphere
+
+    Notes:
+    ------
+    For h in [0, R]:
+        h=0: V=0 (empty)
+        h=R: V=(2/3)πR³ (full hemisphere)
+    """
+    h_ratio = np.asarray(h) / R
+
+    # Clamp to valid range [0, 1]
+    h_ratio_clamped = np.clip(h_ratio, 0, 1)
+
+    # Volume formula
+    volume = (2.0/3.0) * np.pi * R**3 * (3*h_ratio_clamped - h_ratio_clamped**3)
+
+    return volume
+
+
+def fit_hemisphere(x, y, p0=None, bounds=None, verbose=False):
+    """
+    Fit hemisphere model to volume-height data.
+
+    Minimizes: ||V_data - V_hemisphere||²
+
+    Args:
+        x: Height values (array)
+        y: Volume values (array)
+        p0: Initial guess [R] (if None, estimated from data)
+        bounds: Parameter bounds for R
+        verbose: Print fitting details
+
+    Returns:
+        Tuple: (popt, perr) where popt=[R], perr=error_percent
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # Initial guess for radius
+    if p0 is None:
+        # Estimate R from maximum area (which is π*R²)
+        max_area_approx = np.max(np.gradient(y, x))
+        R_guess = np.sqrt(max_area_approx / np.pi)
+        p0 = [R_guess]
+
+    # Fitting bounds (R > 0)
+    if bounds is None:
+        # Conservative bounds: R in [0.5*guess, 3*guess]
+        R_guess = p0[0]
+        bounds = ([0.1*R_guess], [5*R_guess])
+
+    try:
+        popt, _ = curve_fit(volume_hemisphere, x, y,
+                           p0=p0, bounds=bounds,
+                           maxfev=DEFAULT_PARAMS['maxfev'])
+
+        # Calculate error
+        y_pred = volume_hemisphere(x, *popt)
+        error = np.mean(np.abs(y - y_pred))
+        error_pct = (error / (np.max(y) + 1e-8)) * 100
+
+        if verbose:
+            logger.debug(f"Hemisphere fit: R={popt[0]:.2f}mm, error={error_pct:.2f}%")
+
+        return popt, error_pct
+
+    except Exception as e:
+        if verbose:
+            logger.debug(f"Hemisphere fitting failed: {e}")
+        return None, float('inf')
+
+
+def fit_sphere_cap(x, y, p0=None, bounds=None, verbose=False):
+    """
+    Fit sphere cap model to volume-height data.
+
+    Uses formula: V = πh²(3R - h)/3
+
+    Args:
+        x: Height values (array)
+        y: Volume values (array)
+        p0: Initial guess [R] (if None, estimated from data)
+        bounds: Parameter bounds for R
+        verbose: Print fitting details
+
+    Returns:
+        Tuple: (popt, perr) where popt=[R], perr=error_percent
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # Initial guess for radius
+    if p0 is None:
+        # For sphere cap: at some height h, V = πh²(3R - h)/3
+        # If we assume h ≈ 0.5*R_max, we can estimate R
+        h_max = np.max(x)
+        v_max = np.max(y)
+
+        # Approximate: R ≈ 3*V_max / (π*h_max²)
+        R_guess = max(h_max * 1.2, 3*v_max / (np.pi * h_max**2 + 1e-8))
+        p0 = [R_guess]
+
+    # Fitting bounds (R > 0)
+    if bounds is None:
+        R_guess = p0[0]
+        bounds = ([0.1*R_guess], [5*R_guess])
+
+    try:
+        popt, _ = curve_fit(volume_sphere_cap, x, y,
+                           p0=p0, bounds=bounds,
+                           maxfev=DEFAULT_PARAMS['maxfev'])
+
+        # Calculate error
+        y_pred = volume_sphere_cap(x, *popt)
+        error = np.mean(np.abs(y - y_pred))
+        error_pct = (error / (np.max(y) + 1e-8)) * 100
+
+        if verbose:
+            logger.debug(f"Sphere cap fit: R={popt[0]:.2f}mm, error={error_pct:.2f}%")
+
+        return popt, error_pct
+
+    except Exception as e:
+        if verbose:
+            logger.debug(f"Sphere cap fitting failed: {e}")
+        return None, float('inf')
+
 
 def load_data_csv(csv_path, job: AnalysisJob = None, verbose=True):
     """Load and validate CSV data with enhanced error handling."""
