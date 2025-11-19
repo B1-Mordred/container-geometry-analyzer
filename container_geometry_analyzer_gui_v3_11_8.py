@@ -1309,6 +1309,187 @@ def export_vtk_hex(z_profile, r_profile, filename, job: AnalysisJob = None, verb
             job.add_error(f"HXX export failed: {str(e)}")
         return None
 
+def export_directx(z_profile, r_profile, filename, job: AnalysisJob = None, verbose=True):
+    """
+    Export mesh in DirectX .x format for visualization and 3D applications.
+
+    Creates a DirectX text format mesh suitable for:
+    - 3D visualization applications
+    - Game engines (Unity, Unreal with converters)
+    - DirectX-based viewers
+    - General 3D modeling tools
+
+    Format: DirectX .x ASCII format (.x extension)
+    """
+    step_start = time.time()
+
+    if len(z_profile) < 3:
+        if verbose:
+            logger.warning("⚠️  Profile too short for DirectX mesh generation")
+        return None
+
+    ensure_output_dir(filename)
+
+    # Ensure profile starts at z=0
+    z_min = z_profile.min()
+    if z_min > 0:
+        z_profile = z_profile - z_min
+
+    # Mesh parameters
+    angular_res = 48  # Number of angular divisions
+    n_profile = len(z_profile)
+
+    # Generate vertices
+    angles = np.linspace(0, 2 * np.pi, angular_res, endpoint=False)
+    vertices = []
+
+    # Sidewall vertices
+    for i in range(n_profile):
+        z = z_profile[i]
+        r = r_profile[i]
+        for angle in angles:
+            x = r * np.cos(angle)
+            y = r * np.sin(angle)
+            vertices.append([x, y, z])
+
+    # Bottom cap vertices (at z=0)
+    vertices.append([0.0, 0.0, 0.0])  # Center point
+    center_idx = len(vertices) - 1
+
+    for angle in angles:
+        x = r_profile[0] * np.cos(angle)
+        y = r_profile[0] * np.sin(angle)
+        vertices.append([x, y, 0.0])
+
+    vertices = np.array(vertices)
+
+    # Generate faces (triangles)
+    faces = []
+
+    # Sidewall faces
+    for i in range(n_profile - 1):
+        for j in range(angular_res):
+            j_next = (j + 1) % angular_res
+
+            # Current layer vertices
+            v0 = i * angular_res + j
+            v1 = i * angular_res + j_next
+            # Next layer vertices
+            v2 = (i + 1) * angular_res + j_next
+            v3 = (i + 1) * angular_res + j
+
+            # Two triangles per quad
+            faces.append([v0, v1, v2])
+            faces.append([v0, v2, v3])
+
+    # Bottom cap faces (fan from center)
+    bottom_ring_start = center_idx + 1
+    for j in range(angular_res):
+        j_next = (j + 1) % angular_res
+        faces.append([center_idx, bottom_ring_start + j_next, bottom_ring_start + j])
+
+    faces = np.array(faces, dtype=np.int32)
+
+    # Calculate normals (simple face normals)
+    def calculate_normal(v0, v1, v2):
+        """Calculate face normal using cross product."""
+        edge1 = v1 - v0
+        edge2 = v2 - v0
+        normal = np.cross(edge1, edge2)
+        norm_length = np.linalg.norm(normal)
+        if norm_length > 1e-8:
+            normal = normal / norm_length
+        return normal
+
+    # Write DirectX .x file
+    try:
+        with open(filename, 'w') as f:
+            # DirectX header
+            f.write("xof 0303txt 0032\n\n")
+
+            # Mesh header
+            f.write("Mesh ContainerMesh {\n")
+
+            # Vertex count
+            f.write(f"  {len(vertices)};\n")
+
+            # Vertices
+            for i, v in enumerate(vertices):
+                if i < len(vertices) - 1:
+                    f.write(f"  {v[0]:.6f};{v[1]:.6f};{v[2]:.6f};,\n")
+                else:
+                    f.write(f"  {v[0]:.6f};{v[1]:.6f};{v[2]:.6f};;\n")
+
+            # Face count
+            f.write(f"  {len(faces)};\n")
+
+            # Faces
+            for i, face in enumerate(faces):
+                if i < len(faces) - 1:
+                    f.write(f"  3;{face[0]},{face[1]},{face[2]};,\n")
+                else:
+                    f.write(f"  3;{face[0]},{face[1]},{face[2]};;\n")
+
+            # MeshNormals (optional but recommended)
+            f.write("\n  MeshNormals {\n")
+            f.write(f"    {len(faces)};\n")
+
+            # Calculate and write face normals
+            for i, face in enumerate(faces):
+                v0, v1, v2 = vertices[face[0]], vertices[face[1]], vertices[face[2]]
+                normal = calculate_normal(v0, v1, v2)
+                if i < len(faces) - 1:
+                    f.write(f"    {normal[0]:.6f};{normal[1]:.6f};{normal[2]:.6f};,\n")
+                else:
+                    f.write(f"    {normal[0]:.6f};{normal[1]:.6f};{normal[2]:.6f};;\n")
+
+            # Face normal indices (one normal per face)
+            f.write(f"    {len(faces)};\n")
+            for i in range(len(faces)):
+                if i < len(faces) - 1:
+                    f.write(f"    3;{i},{i},{i};,\n")
+                else:
+                    f.write(f"    3;{i},{i},{i};;\n")
+
+            f.write("  }\n")  # End MeshNormals
+            f.write("}\n")    # End Mesh
+
+        # Calculate volume (approximate)
+        total_volume_mm3 = 0.0
+        for i in range(len(z_profile) - 1):
+            dz = z_profile[i + 1] - z_profile[i]
+            r_avg = (r_profile[i] + r_profile[i + 1]) / 2
+            layer_volume = np.pi * r_avg**2 * dz
+            total_volume_mm3 += layer_volume
+
+        total_volume_ml = total_volume_mm3 / 1000
+
+        if verbose:
+            logger.info(f"📐 DirectX .x Export:")
+            logger.info(f"   Filename: {filename}")
+            logger.info(f"   Vertices: {len(vertices)}")
+            logger.info(f"   Faces: {len(faces)}")
+            logger.info(f"   Angular resolution: {angular_res}")
+            logger.info(f"   Vertical layers: {n_profile}")
+            logger.info(f"   Volume: {total_volume_ml:.3f} ml (approx)")
+            logger.info(f"   Format: DirectX .x ASCII")
+
+        if job:
+            job.complete_step('DirectX Export', time.time() - step_start)
+            job.add_output_file(filename, 'DIRECTX_X')
+            job.statistics['dx_vertices'] = int(len(vertices))
+            job.statistics['dx_faces'] = int(len(faces))
+            job.statistics['dx_volume_ml'] = float(total_volume_ml)
+
+        return filename
+
+    except Exception as e:
+        if verbose:
+            logger.error(f"❌ DirectX export failed: {e}", exc_info=True)
+        if job:
+            job.add_error(f"DirectX export failed: {str(e)}")
+        return None
+
 def generate_enhanced_pdf_report(df, df_areas, segments, z_profile, r_profile, 
                                  csv_path, job: AnalysisJob, output_dir="./", verbose=True):
     """Generate comprehensive PDF report with job details and statistics."""
@@ -1844,15 +2025,19 @@ def launch_enhanced_gui():
             
             stl_path = None
             hxx_path = None
+            dx_path = None
             if HAS_TRIMESH:
                 stl_path = export_stl_watertight(z_smooth, r_smooth,
                     f"{base_name}_model_{timestamp}.stl", job=job, verbose=True)
                 # Export HXX (hexahedral mesh) format
                 hxx_path = export_vtk_hex(z_smooth, r_smooth,
                     f"{base_name}_model_{timestamp}.hxx", job=job, verbose=True)
+                # Export DirectX .x format
+                dx_path = export_directx(z_smooth, r_smooth,
+                    f"{base_name}_model_{timestamp}.x", job=job, verbose=True)
             else:
-                logger.warning("⚠️  Trimesh not available - STL/HXX export skipped")
-                job.add_warning("Trimesh not available - STL/HXX export skipped")
+                logger.warning("⚠️  Trimesh not available - STL/HXX/DirectX export skipped")
+                job.add_warning("Trimesh not available - STL/HXX/DirectX export skipped")
 
             pdf_path = None
             if HAS_REPORTLAB:
@@ -1922,12 +2107,16 @@ if __name__ == "__main__":
 
             stl_path = None
             hxx_path = None
+            dx_path = None
             if HAS_TRIMESH:
                 stl_path = export_stl_watertight(z_smooth, r_smooth,
                     f"output_model_{timestamp}.stl", job=job, verbose=True)
                 # Export HXX (hexahedral mesh) format
                 hxx_path = export_vtk_hex(z_smooth, r_smooth,
                     f"output_model_{timestamp}.hxx", job=job, verbose=True)
+                # Export DirectX .x format
+                dx_path = export_directx(z_smooth, r_smooth,
+                    f"output_model_{timestamp}.x", job=job, verbose=True)
 
             pdf_path = None
             if HAS_REPORTLAB:
