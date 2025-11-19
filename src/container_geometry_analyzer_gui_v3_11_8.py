@@ -21,6 +21,7 @@ import logging
 import time
 import tempfile
 from typing import Dict, List, Tuple, Optional
+import argparse
 
 # Setup logging
 logging.basicConfig(
@@ -186,6 +187,36 @@ def ensure_output_dir(filepath):
     directory = os.path.dirname(filepath)
     if directory and not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
+    return filepath
+
+def generate_output_filename(input_file: str, output_dir: str, file_type: str, extension: str) -> str:
+    """
+    Generate output filename in format: {input_basename}-{datetime}-{type}.{extension}
+
+    Args:
+        input_file: Path to input CSV file
+        output_dir: Directory to store output file
+        file_type: Type of file (STL, PDF, HXX, DirectX, etc.)
+        extension: File extension without dot
+
+    Returns:
+        Full path to output file with timestamp
+    """
+    # Get base filename without extension
+    input_basename = os.path.splitext(os.path.basename(input_file))[0]
+
+    # Generate timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Create filename in format: basename-timestamp-type.extension
+    filename = f"{input_basename}-{timestamp}-{file_type}.{extension}"
+
+    # Combine with output directory
+    filepath = os.path.join(output_dir, filename)
+
+    # Ensure directory exists
+    ensure_output_dir(filepath)
+
     return filepath
 
 def volume_cylinder(h, r):
@@ -1490,18 +1521,18 @@ def export_directx(z_profile, r_profile, filename, job: AnalysisJob = None, verb
             job.add_error(f"DirectX export failed: {str(e)}")
         return None
 
-def generate_enhanced_pdf_report(df, df_areas, segments, z_profile, r_profile, 
+def generate_enhanced_pdf_report(df, df_areas, segments, z_profile, r_profile,
                                  csv_path, job: AnalysisJob, output_dir="./", verbose=True):
     """Generate comprehensive PDF report with job details and statistics."""
     if not HAS_REPORTLAB:
         if verbose:
             logger.warning("⚠️  ReportLab unavailable - skipping PDF generation")
         return None
-    
+
     step_start = time.time()
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    pdf_filename = os.path.join(output_dir, f"ContainerReport_{timestamp}.pdf")
-    
+    # Use new filename format: {input_basename}-{datetime}-PDF.pdf
+    pdf_filename = generate_output_filename(csv_path, output_dir, "PDF", "pdf")
+
     ensure_output_dir(pdf_filename)
     
     doc = SimpleDocTemplate(pdf_filename, pagesize=letter,
@@ -1998,19 +2029,35 @@ def launch_enhanced_gui():
     if not HAS_TKINTER:
         logger.info("GUI unavailable - using CLI mode")
         return
-    
+
     root = tk.Tk()
     root.title("Container Geometry Analyzer v3.11.8")
-    root.geometry("750x550")
-    
-    def analyze_file():
+    root.geometry("800x650")
+
+    # Track selected output directory
+    selected_output_dir = tk.StringVar(value=os.getcwd())
+
+    def select_input_file():
         filepath = filedialog.askopenfilename(
             title="Select Volume-Height CSV",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
         )
-        
+
         if not filepath:
             return
+        input_file_label.config(text=f"Input: {os.path.basename(filepath)}")
+        analyze_file(filepath)
+
+    def select_output_directory():
+        directory = filedialog.askdirectory(
+            title="Select Output Directory"
+        )
+        if directory:
+            selected_output_dir.set(directory)
+            output_dir_label.config(text=f"Output: {directory}")
+
+    def analyze_file(filepath):
+        output_dir = selected_output_dir.get()
         
         try:
             job = AnalysisJob(filepath)
@@ -2020,29 +2067,27 @@ def launch_enhanced_gui():
             segments = segment_and_fit_optimized(df_areas, job=job, verbose=True)
             z_smooth, r_smooth = create_enhanced_profile(segments, df_areas, job=job, verbose=True)
             
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            base_name = os.path.splitext(os.path.basename(filepath))[0]
-            
             stl_path = None
             hxx_path = None
             dx_path = None
             if HAS_TRIMESH:
-                stl_path = export_stl_watertight(z_smooth, r_smooth,
-                    f"{base_name}_model_{timestamp}.stl", job=job, verbose=True)
+                stl_filename = generate_output_filename(filepath, output_dir, "STL", "stl")
+                stl_path = export_stl_watertight(z_smooth, r_smooth, stl_filename, job=job, verbose=True)
                 # Export HXX (hexahedral mesh) format
-                hxx_path = export_vtk_hex(z_smooth, r_smooth,
-                    f"{base_name}_model_{timestamp}.hxx", job=job, verbose=True)
+                hxx_filename = generate_output_filename(filepath, output_dir, "HXX", "hxx")
+                hxx_path = export_vtk_hex(z_smooth, r_smooth, hxx_filename, job=job, verbose=True)
                 # Export DirectX .x format
-                dx_path = export_directx(z_smooth, r_smooth,
-                    f"{base_name}_model_{timestamp}.x", job=job, verbose=True)
+                dx_filename = generate_output_filename(filepath, output_dir, "DirectX", "x")
+                dx_path = export_directx(z_smooth, r_smooth, dx_filename, job=job, verbose=True)
             else:
                 logger.warning("⚠️  Trimesh not available - STL/HXX/DirectX export skipped")
                 job.add_warning("Trimesh not available - STL/HXX/DirectX export skipped")
 
             pdf_path = None
             if HAS_REPORTLAB:
+                # generate_enhanced_pdf_report will use generate_output_filename internally
                 pdf_path = generate_enhanced_pdf_report(df, df_areas, segments, z_smooth, r_smooth,
-                    filepath, job, os.getcwd(), verbose=True)
+                    filepath, job, output_dir, verbose=True)
             else:
                 logger.warning("⚠️  ReportLab not available - PDF report skipped")
                 job.add_warning("ReportLab not available - PDF report skipped")
@@ -2069,75 +2114,135 @@ Total Outputs: {summary['outputs_count']}
             logger.error(f"Analysis failed: {e}", exc_info=True)
             messagebox.showerror("Analysis Error", f"Failed to analyze file:\n{str(e)}")
     
-    ttk.Label(root, text="Container Geometry Analyzer", 
+    ttk.Label(root, text="Container Geometry Analyzer",
              font=("Arial", 18, "bold")).pack(pady=20)
-    
-    ttk.Label(root, text="Version 3.11.8", 
+
+    ttk.Label(root, text="Version 3.11.8",
              font=("Arial", 12)).pack(pady=5)
-    
-    ttk.Button(root, text="📁 Select Volume-Height CSV", 
-              command=analyze_file, width=40).pack(pady=30)
-    
-    features_frame = ttk.LabelFrame(root, text="", padding=15)
+
+    # Input/Output directory info frame
+    info_frame = ttk.LabelFrame(root, text="Selected Paths", padding=10)
+    info_frame.pack(pady=10, padx=20, fill='x')
+
+    input_file_label = ttk.Label(info_frame, text="Input: Not selected", font=("Arial", 9))
+    input_file_label.pack(anchor="w", pady=5)
+
+    output_dir_label = ttk.Label(info_frame, text=f"Output: {os.getcwd()}", font=("Arial", 9))
+    output_dir_label.pack(anchor="w", pady=5)
+
+    # Button frame
+    button_frame = ttk.Frame(root)
+    button_frame.pack(pady=20, padx=20, fill='x')
+
+    ttk.Button(button_frame, text="📁 Select Input CSV",
+              command=select_input_file, width=40).pack(pady=10)
+
+    ttk.Button(button_frame, text="📂 Select Output Directory",
+              command=select_output_directory, width=40).pack(pady=10)
+
+    features_frame = ttk.LabelFrame(root, text="Features", padding=15)
     features_frame.pack(pady=20, padx=20, fill='both', expand=True)
-    
-    features_text = """
-    
-    """
-    
-    ttk.Label(features_frame, text=features_text, justify="left", 
+
+    features_text = """✓ Multi-derivative transition detection
+✓ Adaptive SNR-based thresholding
+✓ Watertight STL mesh generation
+✓ Professional PDF reports
+✓ HXX hexahedral mesh export
+✓ DirectX .x format export
+✓ Comprehensive statistics and analysis"""
+
+    ttk.Label(features_frame, text=features_text, justify="left",
              font=("Arial", 9)).pack()
-    
+
     root.mainloop()
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        csv_file = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description="Container Geometry Analyzer - Analyze container geometry from volume-height data",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # GUI mode (default)
+  python script.py
+
+  # CLI mode with input file
+  python script.py data.csv
+
+  # CLI mode with input file and output directory
+  python script.py data.csv -o ./output
+
+  # CLI mode with input file and output directory (long form)
+  python script.py data.csv --output ./output
+        """
+    )
+    parser.add_argument("input_file", nargs="?", help="Input CSV file with volume-height data")
+    parser.add_argument("-o", "--output", default=os.getcwd(),
+                        help="Output directory for results (default: current directory)")
+
+    args = parser.parse_args()
+
+    if args.input_file:
+        # CLI mode
+        csv_file = args.input_file
+        output_dir = args.output
+
+        # Ensure input file exists
+        if not os.path.exists(csv_file):
+            logger.error(f"❌ Input file not found: {csv_file}")
+            sys.exit(1)
+
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
         try:
             job = AnalysisJob(csv_file)
-            
+
             logger.info(f"Starting analysis of: {csv_file}")
-            
+            logger.info(f"Output directory: {output_dir}")
+
             df = load_data_csv(csv_file, job=job, verbose=True)
             df_areas = compute_areas(df, job=job, verbose=True)
             segments = segment_and_fit_optimized(df_areas, job=job, verbose=True)
             z_smooth, r_smooth = create_enhanced_profile(segments, df_areas, job=job, verbose=True)
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             stl_path = None
             hxx_path = None
             dx_path = None
             if HAS_TRIMESH:
-                stl_path = export_stl_watertight(z_smooth, r_smooth,
-                    f"output_model_{timestamp}.stl", job=job, verbose=True)
+                stl_filename = generate_output_filename(csv_file, output_dir, "STL", "stl")
+                stl_path = export_stl_watertight(z_smooth, r_smooth, stl_filename, job=job, verbose=True)
                 # Export HXX (hexahedral mesh) format
-                hxx_path = export_vtk_hex(z_smooth, r_smooth,
-                    f"output_model_{timestamp}.hxx", job=job, verbose=True)
+                hxx_filename = generate_output_filename(csv_file, output_dir, "HXX", "hxx")
+                hxx_path = export_vtk_hex(z_smooth, r_smooth, hxx_filename, job=job, verbose=True)
                 # Export DirectX .x format
-                dx_path = export_directx(z_smooth, r_smooth,
-                    f"output_model_{timestamp}.x", job=job, verbose=True)
+                dx_filename = generate_output_filename(csv_file, output_dir, "DirectX", "x")
+                dx_path = export_directx(z_smooth, r_smooth, dx_filename, job=job, verbose=True)
 
             pdf_path = None
             if HAS_REPORTLAB:
                 pdf_path = generate_enhanced_pdf_report(df, df_areas, segments, z_smooth, r_smooth,
-                    csv_file, job, os.getcwd(), verbose=True)
-            
+                    csv_file, job, output_dir, verbose=True)
+
             job.finalize()
             summary = job.get_summary()
-            
+
             logger.info(f"✅ Analysis Complete!")
             logger.info(f"   Duration: {summary['duration']:.2f} seconds")
             logger.info(f"   Steps: {summary['steps_count']}")
             logger.info(f"   STL: {stl_path if stl_path else 'N/A'} (Bottom ✅ CLOSED)")
+            logger.info(f"   HXX: {hxx_path if hxx_path else 'N/A'}")
+            logger.info(f"   DirectX: {dx_path if dx_path else 'N/A'}")
             logger.info(f"   PDF: {pdf_path if pdf_path else 'N/A'}")
-            
+
         except Exception as e:
             logger.error(f"Analysis failed: {e}", exc_info=True)
             sys.exit(1)
     else:
+        # GUI mode
         if HAS_TKINTER:
             launch_enhanced_gui()
         else:
-            logger.info("GUI unavailable. Install tkinter or provide CSV filename as argument:")
-            logger.info("  python script.py your_data.csv")
+            logger.error("GUI unavailable. Install tkinter or provide CSV filename as argument:")
+            logger.info("Usage: python script.py <input.csv> [-o output_dir]")
+            parser.print_help()
+            sys.exit(1)
