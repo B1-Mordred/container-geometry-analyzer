@@ -36,6 +36,7 @@ build_executable.bat
 
 ## ✨ Key Features
 
+- **Multi-Shape Detection**: Recognizes cylinders, frustums, cones, and sphere caps
 - **Multi-derivative Transition Detection**: Intelligent segmentation using combined 1st and 2nd derivatives
 - **Adaptive SNR-Based Thresholding**: Automatic sensitivity adjustment based on data quality
 - **Watertight STL Generation**: Guaranteed closed 3D meshes for 3D printing or CAD
@@ -78,8 +79,14 @@ build_executable.bat
 ## ⚠️ Limitations
 
 ### Shape Support
-- ✅ **Supported**: Cylinders, frustums (conical tapers)
-- ❌ **Not Supported**: Spheres, ellipsoids, irregular shapes, non-axisymmetric containers
+- ✅ **Supported**:
+  - Cylinders
+  - Frustums (conical tapers)
+  - **Sphere caps** (spherical bottoms - common in lab containers)
+  - Cones
+- ❌ **Not Supported**:
+  - Full spheres (only caps are supported)
+  - Ellipsoids, irregular shapes, non-axisymmetric containers
 
 ### Data Requirements
 - **Minimum Data Points**: 12 (recommended: 50+)
