@@ -144,7 +144,7 @@ try:
     df = load_data_csv(test_file, job=job, verbose=True)
     print(f"      Loaded {len(df)} data points")
     print(f"      Height range: {df['Height_mm'].min():.2f} - {df['Height_mm'].max():.2f} mm")
-    print(f"      Volume range: {df['Volume_mL'].min():.2f} - {df['Volume_mL'].max():.2f} mL")
+    print(f"      Volume range: {df['Volume_ml'].min():.2f} - {df['Volume_ml'].max():.2f} mL")
 
     # Step 2: Compute areas
     print("\n[2/4] Computing cross-sectional areas...")
