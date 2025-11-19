@@ -68,8 +68,8 @@ except ImportError:
 DEFAULT_PARAMS = {
     'min_points': 12,
     'sg_window': 9,
-    'percentile': 80,
-    'variance_threshold': 0.15,
+    'percentile': 90,  # Increased from 80 to reduce false segmentation (less sensitive)
+    'variance_threshold': 0.14,  # Tuned to 0.14 for optimal balance (was 0.12, causing over-segmentation)
     'transition_buffer': 2.5,
     'hermite_tension': 0.6,
     'merge_threshold': 0.05,
@@ -466,15 +466,19 @@ def find_optimal_transitions(area, min_points=12, percentile=80, variance_thresh
         seg_start, seg_end = transitions[i], transitions[i + 1]
         if seg_end - seg_start + 1 >= min_points:
             seg_var = np.std(area[seg_start:seg_end]) / (np.mean(area[seg_start:seg_end]) + 1e-8)
-            if seg_var > variance_threshold or i in [0, len(transitions) - 2]:
+            # Only validate segments that meet the variance threshold
+            if seg_var > variance_threshold:
                 validated.append(seg_end)
-    
-    if not validated or validated[-1] != n - 1:
+
+    # Ensure we have at least one segment (entire container)
+    if len(validated) == 1:
+        validated.append(n - 1)
+    elif validated[-1] != n - 1:
         validated[-1] = n - 1
-    
+
     validated = sorted(list(set(validated)))
     if verbose:
-        logger.info(f"   Validated segments: {len(validated)//2}")
+        logger.info(f"   Validated segments: {len(validated) - 1}")
 
     return validated
 
@@ -675,7 +679,13 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
         if verbose:
             logger.info("✨ Using improved transition detection (multi-derivative + adaptive)")
     else:
-        transitions = find_optimal_transitions(area, verbose=verbose)
+        transitions = find_optimal_transitions(
+            area,
+            min_points=DEFAULT_PARAMS['min_points'],
+            percentile=DEFAULT_PARAMS['percentile'],
+            variance_threshold=DEFAULT_PARAMS['variance_threshold'],
+            verbose=verbose
+        )
         if verbose:
             logger.info("📊 Using legacy transition detection")
 

@@ -1,0 +1,302 @@
+{
+  "timestamp": "2025-11-19T15:39:57.993603",
+  "configuration": {
+    "area_method": "local_regression",
+    "transition_detection": "legacy",
+    "adaptive_threshold": true
+  },
+  "summary": {
+    "total_tests": 15,
+    "passed": 11,
+    "with_warnings": 0,
+    "failed": 4,
+    "pass_rate": 73.33333333333333,
+    "total_duration_ms": 322.67308235168457,
+    "avg_duration_ms": 21.511538823445637,
+    "avg_fit_error_pct": 2.050865027899703,
+    "max_fit_error_pct": 6.696888027341662,
+    "shape_counts": {
+      "frustum": 8,
+      "cylinder": 7,
+      "cone": 3,
+      "sphere_cap": 2
+    }
+  },
+  "results": [
+    {
+      "test_name": "composite_centrifuge_cone_cylinder",
+      "passed": true,
+      "duration_ms": 38.96069526672363,
+      "segments_detected": 2,
+      "shapes_detected": [
+        "frustum",
+        "cylinder"
+      ],
+      "fit_errors": [
+        6.580652440785138,
+        0.6569704891364875
+      ],
+      "avg_fit_error": 3.6188114649608125,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "composite_eppendorf_complex",
+      "passed": true,
+      "duration_ms": 28.812408447265625,
+      "segments_detected": 2,
+      "shapes_detected": [
+        "frustum",
+        "frustum"
+      ],
+      "fit_errors": [
+        6.696888027341662,
+        5.771924428331218
+      ],
+      "avg_fit_error": 6.234406227836439,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "composite_flask_sphere_cylinder",
+      "passed": false,
+      "duration_ms": 19.48070526123047,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "cylinder"
+      ],
+      "fit_errors": [
+        1.3039257938037963
+      ],
+      "avg_fit_error": 1.3039257938037963,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [
+        "Segment count mismatch: expected 2, got 1"
+      ],
+      "warnings": []
+    },
+    {
+      "test_name": "cone_centrifuge_tip",
+      "passed": true,
+      "duration_ms": 15.857458114624023,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "cone"
+      ],
+      "fit_errors": [
+        0.36440610874638407
+      ],
+      "avg_fit_error": 0.36440610874638407,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "cone_pipette_tip",
+      "passed": false,
+      "duration_ms": 30.086040496826172,
+      "segments_detected": 2,
+      "shapes_detected": [
+        "cone",
+        "frustum"
+      ],
+      "fit_errors": [
+        2.1137038948971143,
+        0.43785683613578485
+      ],
+      "avg_fit_error": 1.2757803655164497,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [
+        "Segment count mismatch: expected 1, got 2"
+      ],
+      "warnings": []
+    },
+    {
+      "test_name": "cylinder_fine_sampling",
+      "passed": true,
+      "duration_ms": 21.065950393676758,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "cylinder"
+      ],
+      "fit_errors": [
+        0.325761307539073
+      ],
+      "avg_fit_error": 0.325761307539073,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "cylinder_high_noise",
+      "passed": false,
+      "duration_ms": 27.215242385864258,
+      "segments_detected": 2,
+      "shapes_detected": [
+        "cone",
+        "frustum"
+      ],
+      "fit_errors": [
+        5.351668021666796,
+        2.205708688613934
+      ],
+      "avg_fit_error": 3.778688355140365,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [
+        "Segment count mismatch: expected 1, got 2"
+      ],
+      "warnings": [
+        "Expected shape 'cylinder' not found. Detected: ['cone', 'frustum']"
+      ]
+    },
+    {
+      "test_name": "cylinder_large_60mm",
+      "passed": true,
+      "duration_ms": 17.281055450439453,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "cylinder"
+      ],
+      "fit_errors": [
+        0.7109504028020895
+      ],
+      "avg_fit_error": 0.7109504028020895,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "cylinder_medium_17mm",
+      "passed": true,
+      "duration_ms": 16.833782196044922,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "cylinder"
+      ],
+      "fit_errors": [
+        0.6084249101239024
+      ],
+      "avg_fit_error": 0.6084249101239024,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "cylinder_small_5mm",
+      "passed": true,
+      "duration_ms": 18.04327964782715,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "cylinder"
+      ],
+      "fit_errors": [
+        0.7738807552325541
+      ],
+      "avg_fit_error": 0.7738807552325541,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "cylinder_sparse_sampling",
+      "passed": true,
+      "duration_ms": 15.141487121582031,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "cylinder"
+      ],
+      "fit_errors": [
+        0.5024693393547094
+      ],
+      "avg_fit_error": 0.5024693393547094,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "frustum_expanding_beaker",
+      "passed": true,
+      "duration_ms": 16.273975372314453,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "frustum"
+      ],
+      "fit_errors": [
+        0.5024117303919474
+      ],
+      "avg_fit_error": 0.5024117303919474,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "frustum_narrow_to_wide",
+      "passed": true,
+      "duration_ms": 16.531705856323242,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "frustum"
+      ],
+      "fit_errors": [
+        0.6605971265726819
+      ],
+      "avg_fit_error": 0.6605971265726819,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "test_name": "sphere_cap_flask_bottom",
+      "passed": false,
+      "duration_ms": 22.481203079223633,
+      "segments_detected": 2,
+      "shapes_detected": [
+        "sphere_cap",
+        "frustum"
+      ],
+      "fit_errors": [
+        3.644049403231627,
+        1.0089583346746263
+      ],
+      "avg_fit_error": 2.3265038689531266,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [
+        "Segment count mismatch: expected 1, got 2"
+      ],
+      "warnings": []
+    },
+    {
+      "test_name": "sphere_cap_vial_bottom",
+      "passed": true,
+      "duration_ms": 18.60809326171875,
+      "segments_detected": 1,
+      "shapes_detected": [
+        "sphere_cap"
+      ],
+      "fit_errors": [
+        0.7960925186125418
+      ],
+      "avg_fit_error": 0.7960925186125418,
+      "area_method": "local_regression",
+      "transition_method": "legacy",
+      "errors": [],
+      "warnings": []
+    }
+  ]
+}
