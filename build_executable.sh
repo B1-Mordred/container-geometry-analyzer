@@ -6,9 +6,15 @@
 
 set -e
 
+# Change to the script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
 echo "==============================================="
 echo "Container Geometry Analyzer - Build Script"
 echo "==============================================="
+echo ""
+echo "Working directory: $(pwd)"
 echo ""
 
 # Check if Python is installed
