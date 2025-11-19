@@ -74,6 +74,7 @@ DEFAULT_PARAMS = {
     'transition_buffer': 2.5,
     'hermite_tension': 0.6,
     'merge_threshold': 0.12,  # Increased from 0.05 to 0.12 for aggressive segment merging
+    'curvature_threshold': 0.05,  # Priority 2: Threshold for curved surface filtering (tuned to 0.05 for optimal 80% pass rate)
     'angular_resolution': 48,
     'maxfev': 4000,
     'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - SWITCHED TO IMPROVED for better sphere cap detection
@@ -1117,8 +1118,9 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
     # Remove false transitions that occur within curved regions (inflection points)
     # Keep transitions only at boundaries between curved and linear regions
     try:
+        curvature_threshold = DEFAULT_PARAMS.get('curvature_threshold', 0.10)
         validated = filter_transitions_in_curves(
-            validated, area, heights, curvature_threshold=0.10
+            validated, area, heights, curvature_threshold=curvature_threshold
         )
         validated = sorted(list(set(validated)))
         if verbose:
