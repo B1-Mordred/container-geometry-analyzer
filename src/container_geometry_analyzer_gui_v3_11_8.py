@@ -1113,6 +1113,20 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
 
     validated = sorted(list(set(validated)))
 
+    # === IMPROVEMENT 4: Curvature-aware filtering (Priority 2) ===
+    # Remove false transitions that occur within curved regions (inflection points)
+    # Keep transitions only at boundaries between curved and linear regions
+    try:
+        validated = filter_transitions_in_curves(
+            validated, area, heights, curvature_threshold=0.10
+        )
+        validated = sorted(list(set(validated)))
+        if verbose:
+            logger.info(f"   Curvature filtering applied: {len(validated) - 1} segments after filtering")
+    except Exception as e:
+        if verbose:
+            logger.warning(f"   Curvature filtering failed (using unfiltered): {e}")
+
     if verbose:
         logger.info(f"   Validated segments: {len(validated) - 1}")
 
@@ -1199,6 +1213,37 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
         # Prepare to test all shape types
         fit_results = []  # List of (shape_name, params, error_pct)
+
+        # === 0. TRY CURVED SURFACE DETECTION (Priority 2) ===
+        # Check for hemispheres and sphere caps before standard shape fitting
+        segment_area = area[start:end + 1]
+        segment_heights = heights[start:end + 1] if len(heights) > 0 else np.arange(len(segment_area))
+
+        # Normalize heights to start from 0 for analysis
+        segment_heights_normalized = segment_heights - segment_heights[0]
+
+        try:
+            # Check for hemisphere signature
+            if detect_hemisphere_signature(segment_area, segment_heights_normalized):
+                try:
+                    hem_popt, hem_error = fit_hemisphere(segment_heights_normalized, y, verbose=False)
+                    if hem_popt is not None:
+                        fit_results.append(('hemisphere', hem_popt, hem_error))
+                        logger.debug(f"Segment {i}: Hemisphere fit error = {hem_error:.2f}%")
+                except Exception as e:
+                    logger.debug(f"Hemisphere fitting failed for segment {i}: {e}")
+
+            # Check for sphere cap signature
+            if detect_sphere_cap_signature(segment_area, segment_heights_normalized):
+                try:
+                    sphere_popt, sphere_error = fit_sphere_cap(segment_heights_normalized, y, verbose=False)
+                    if sphere_popt is not None:
+                        fit_results.append(('sphere_cap', sphere_popt, sphere_error))
+                        logger.debug(f"Segment {i}: Sphere cap fit error (Priority 2) = {sphere_error:.2f}%")
+                except Exception as e:
+                    logger.debug(f"Sphere cap fitting failed for segment {i}: {e}")
+        except Exception as e:
+            logger.debug(f"Curved surface detection failed for segment {i}: {e}")
 
         # === 1. TRY CYLINDER FIT ===
         try:
@@ -1398,8 +1443,9 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             if next_shape != current_shape or next_start > current_end + 1:
                 break
 
-            # Never merge sphere_cap with other shapes - it's a distinct boundary
-            if current_shape == 'sphere_cap' or next_shape == 'sphere_cap':
+            # Never merge sphere_cap or hemisphere with other shapes - they're distinct boundaries
+            if (current_shape in ('sphere_cap', 'hemisphere') or
+                next_shape in ('sphere_cap', 'hemisphere')):
                 break
 
             # For frustums, check if radius progression is continuous
@@ -1460,6 +1506,27 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
                     if verbose:
                         logger.debug(f"Merging segment {i} and {i+merge_count} (adjacent cones, similar apex)")
+                    continue
+
+            # For hemispheres, check if radius is consistent (Priority 2)
+            # Consecutive hemispheres might indicate a single hemisphere split by inflection points
+            elif current_shape == 'hemisphere' and len(current_params) >= 1 and len(next_params) >= 1:
+                R_current = float(current_params[0])
+                R_next = float(next_params[0])
+
+                radius_diff = abs(R_current - R_next) / (max(R_current, R_next) + 1e-6)
+
+                # Use stricter tolerance for hemispheres (0.05 = 5% difference)
+                if radius_diff < 0.05:
+                    current_end = next_end
+                    # Average the radii for merged hemisphere
+                    R_merged = (R_current + R_next) / 2.0
+                    current_params = [R_merged]
+                    merge_count += 1
+                    skip_indices.add(i + merge_count)
+
+                    if verbose:
+                        logger.debug(f"Merging segment {i} and {i+merge_count} (consecutive hemispheres from inflection split)")
                     continue
 
             break
