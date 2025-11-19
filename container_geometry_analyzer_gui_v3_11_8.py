@@ -68,14 +68,14 @@ except ImportError:
 DEFAULT_PARAMS = {
     'min_points': 12,
     'sg_window': 9,
-    'percentile': 80,
-    'variance_threshold': 0.15,
+    'percentile': 90,  # Increased from 80 to reduce false segmentation (less sensitive)
+    'variance_threshold': 0.14,  # Tuned to 0.14 for optimal balance (was 0.12, causing over-segmentation)
     'transition_buffer': 2.5,
     'hermite_tension': 0.6,
     'merge_threshold': 0.05,
     'angular_resolution': 48,
     'maxfev': 4000,
-    'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - USING IMPROVED
+    'transition_detection_method': 'legacy',  # 'legacy' or 'improved' (multi-derivative) - USING LEGACY (better for composites)
     'use_adaptive_threshold': True,  # Adaptive SNR-based thresholds
     'use_multiscale': False,  # More thorough but slower
     'use_local_regression': True,  # Local polynomial regression for area computation
@@ -466,15 +466,19 @@ def find_optimal_transitions(area, min_points=12, percentile=80, variance_thresh
         seg_start, seg_end = transitions[i], transitions[i + 1]
         if seg_end - seg_start + 1 >= min_points:
             seg_var = np.std(area[seg_start:seg_end]) / (np.mean(area[seg_start:seg_end]) + 1e-8)
-            if seg_var > variance_threshold or i in [0, len(transitions) - 2]:
+            # Only validate segments that meet the variance threshold
+            if seg_var > variance_threshold:
                 validated.append(seg_end)
-    
-    if not validated or validated[-1] != n - 1:
+
+    # Ensure we have at least one segment (entire container)
+    if len(validated) == 1:
+        validated.append(n - 1)
+    elif validated[-1] != n - 1:
         validated[-1] = n - 1
-    
+
     validated = sorted(list(set(validated)))
     if verbose:
-        logger.info(f"   Validated segments: {len(validated)//2}")
+        logger.info(f"   Validated segments: {len(validated) - 1}")
 
     return validated
 
@@ -675,7 +679,13 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
         if verbose:
             logger.info("✨ Using improved transition detection (multi-derivative + adaptive)")
     else:
-        transitions = find_optimal_transitions(area, verbose=verbose)
+        transitions = find_optimal_transitions(
+            area,
+            min_points=DEFAULT_PARAMS['min_points'],
+            percentile=DEFAULT_PARAMS['percentile'],
+            variance_threshold=DEFAULT_PARAMS['variance_threshold'],
+            verbose=verbose
+        )
         if verbose:
             logger.info("📊 Using legacy transition detection")
 
@@ -780,6 +790,44 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             # Sort by error (lowest first)
             fit_results.sort(key=lambda x: x[2])
             best_shape, best_params, best_error = fit_results[0]
+
+            # === CYLINDER PREFERENCE FIX ===
+            # If frustum is selected but r1 ≈ r2, prefer simpler cylinder model
+            if best_shape == 'frustum' and len(best_params) >= 2:
+                r1, r2 = float(best_params[0]), float(best_params[1])
+                r_max = max(r1, r2)
+                r_min = min(r1, r2)
+
+                if r_max > 0:
+                    relative_diff = abs(r2 - r1) / r_max
+
+                    # If radii are within 5%, this is essentially a cylinder
+                    if relative_diff < 0.05:
+                        # Find cylinder fit if it exists
+                        cylinder_fit = next((f for f in fit_results if f[0] == 'cylinder'), None)
+
+                        if cylinder_fit:
+                            cyl_shape, cyl_params, cyl_error = cylinder_fit
+
+                            # Prefer cylinder if error is within 20% of frustum error
+                            # (Allow slightly worse fit for simpler model)
+                            if cyl_error <= best_error * 1.2:
+                                best_shape = 'cylinder'
+                                best_params = cyl_params
+                                best_error = cyl_error
+
+                                if verbose:
+                                    logger.debug(f"Segment {i}: Preferring cylinder over near-cylindrical frustum "
+                                               f"(r1={r1:.2f}, r2={r2:.2f}, diff={relative_diff*100:.1f}%)")
+                        else:
+                            # No cylinder fit available, convert frustum to cylinder
+                            r_avg = (r1 + r2) / 2
+                            best_shape = 'cylinder'
+                            best_params = [r_avg]
+
+                            if verbose:
+                                logger.debug(f"Segment {i}: Converting near-cylindrical frustum to cylinder "
+                                           f"(r_avg={r_avg:.2f}mm)")
 
             segments.append((start, end, best_shape, best_params))
             fit_errors.append(best_error)
