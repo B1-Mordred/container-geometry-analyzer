@@ -74,7 +74,10 @@ DEFAULT_PARAMS = {
     'hermite_tension': 0.6,
     'merge_threshold': 0.05,
     'angular_resolution': 48,
-    'maxfev': 4000
+    'maxfev': 4000,
+    'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative)
+    'use_adaptive_threshold': True,
+    'use_multiscale': False,  # More thorough but slower
 }
 
 GEOMETRIC_CONSTRAINTS = {
@@ -335,7 +338,179 @@ def find_optimal_transitions(area, min_points=12, percentile=80, variance_thresh
     validated = sorted(list(set(validated)))
     if verbose:
         logger.info(f"   Validated segments: {len(validated)//2}")
-    
+
+    return validated
+
+def find_optimal_transitions_improved(area, heights=None, min_points=12,
+                                      use_adaptive=True, verbose=False):
+    """
+    Improved transition detection using multi-derivative analysis.
+
+    Key improvements over legacy method:
+    1. Uses second derivative (curvature) to detect slope changes
+    2. Adaptive threshold based on signal-to-noise ratio
+    3. Better validation using multiple criteria
+
+    Parameters:
+    -----------
+    area : np.ndarray
+        Cross-sectional areas
+    heights : np.ndarray, optional
+        Height values (if None, uses indices)
+    min_points : int
+        Minimum points per segment
+    use_adaptive : bool
+        Use adaptive thresholding based on SNR
+    verbose : bool
+        Print detailed information
+
+    Returns:
+    --------
+    List[int] : Indices of transition points
+    """
+    n = len(area)
+
+    if heights is None:
+        heights = np.arange(n, dtype=float)
+
+    if n < 2 * min_points:
+        if verbose:
+            logger.warning(f"⚠️  Too few points for segmentation ({n} < {2*min_points})")
+        return [0, n - 1]
+
+    # Smooth the area data
+    window = max(5, min(15, n // 10))
+    if window % 2 == 0:
+        window += 1
+
+    try:
+        area_smooth = savgol_filter(area, window_length=window, polyorder=2)
+    except:
+        from scipy.ndimage import gaussian_filter1d
+        area_smooth = gaussian_filter1d(area, sigma=2.0)
+
+    # === IMPROVEMENT 1: Multi-derivative detection ===
+    # Use both first and second derivatives
+    first_deriv = np.gradient(area_smooth, heights)
+    second_deriv = np.gradient(first_deriv, heights)
+
+    # Combine derivatives for better detection
+    first_deriv_change = np.abs(np.diff(first_deriv))
+    second_deriv_abs = np.abs(second_deriv[:-1])
+
+    # Normalize scores
+    def normalize_score(arr):
+        arr_min, arr_max = np.min(arr), np.max(arr)
+        if arr_max - arr_min < 1e-10:
+            return np.zeros_like(arr)
+        return (arr - arr_min) / (arr_max - arr_min)
+
+    score = (0.6 * normalize_score(first_deriv_change) +
+             0.4 * normalize_score(second_deriv_abs))
+
+    # === IMPROVEMENT 2: Adaptive threshold ===
+    if use_adaptive:
+        # Estimate signal-to-noise ratio
+        area_very_smooth = savgol_filter(area,
+            window_length=min(21, n//5 if n//5 % 2 == 1 else n//5+1),
+            polyorder=2)
+        noise = area - area_very_smooth
+        noise_std = np.std(noise)
+        signal_range = np.max(area) - np.min(area)
+        snr = signal_range / (noise_std + 1e-8)
+
+        # Adapt percentile based on SNR
+        if snr > 100:
+            percentile = 70  # Very clean data - more sensitive
+        elif snr > 50:
+            percentile = 75  # Clean data
+        elif snr > 20:
+            percentile = 80  # Moderate noise (default)
+        elif snr > 10:
+            percentile = 85  # Noisy data
+        else:
+            percentile = 90  # Very noisy - less sensitive
+
+        if verbose:
+            logger.info(f"   SNR: {snr:.2f}, adaptive percentile: {percentile}")
+    else:
+        percentile = 80  # Legacy default
+
+    threshold = np.percentile(score, percentile)
+
+    # Find candidates from peak detection
+    try:
+        from scipy.signal import find_peaks
+        candidates, _ = find_peaks(score, height=threshold, distance=min_points)
+        candidates = candidates + 1  # Adjust for diff operation
+    except:
+        # Fallback to simple threshold
+        candidates = np.where(score > threshold)[0] + 1
+
+    if verbose:
+        logger.info(f"🔍 Improved detection: {len(candidates)} candidates (multi-derivative + adaptive)")
+
+    # Enforce minimum spacing
+    transitions = [0]
+    for cand in sorted(candidates):
+        if cand - transitions[-1] >= min_points and cand < n - 1:
+            transitions.append(int(cand))
+
+    if transitions[-1] != n - 1:
+        transitions.append(n - 1)
+
+    # === IMPROVEMENT 3: Advanced validation ===
+    validated = [transitions[0]]
+
+    for i in range(len(transitions) - 1):
+        seg_start = transitions[i]
+        seg_end = transitions[i + 1]
+
+        if seg_end - seg_start + 1 < min_points:
+            continue
+
+        seg_area = area[seg_start:seg_end + 1]
+
+        # Criterion 1: Coefficient of variation
+        cv = np.std(seg_area) / (np.mean(seg_area) + 1e-8)
+        has_variation = cv > 0.05  # Lower threshold than legacy (0.15)
+
+        # Criterion 2: Autocorrelation (structure vs noise)
+        if len(seg_area) > 3:
+            area_shifted = seg_area[1:]
+            area_orig = seg_area[:-1]
+            correlation = np.corrcoef(area_orig, area_shifted)[0, 1]
+            has_structure = abs(correlation) > 0.4
+        else:
+            has_structure = True
+
+        # Criterion 3: Model fit quality
+        z = np.arange(len(seg_area))
+        if len(z) > 2:
+            coeffs = np.polyfit(z, seg_area, 1)
+            area_predicted = np.polyval(coeffs, z)
+            r_squared = 1 - (np.sum((seg_area - area_predicted)**2) /
+                           (np.sum((seg_area - np.mean(seg_area))**2) + 1e-8))
+            fits_model = r_squared > 0.65
+        else:
+            fits_model = True
+
+        # Keep if passes at least 2 criteria, or is boundary segment
+        is_boundary = i in [0, len(transitions) - 2]
+        passed_criteria = sum([has_variation, has_structure, fits_model])
+
+        if passed_criteria >= 2 or is_boundary:
+            validated.append(seg_end)
+
+    # Ensure endpoints
+    if not validated or validated[-1] != transitions[-1]:
+        validated.append(transitions[-1])
+
+    validated = sorted(list(set(validated)))
+
+    if verbose:
+        logger.info(f"   Validated segments: {len(validated) - 1}")
+
     return validated
 
 def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
@@ -349,7 +524,24 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             job.add_warning(warning_msg)
     
     area = df_areas['Area'].values
-    transitions = find_optimal_transitions(area)
+    heights = df_areas['Height_mm'].values
+
+    # Use improved or legacy transition detection
+    if DEFAULT_PARAMS.get('transition_detection_method', 'legacy') == 'improved':
+        transitions = find_optimal_transitions_improved(
+            area,
+            heights=heights,
+            min_points=DEFAULT_PARAMS['min_points'],
+            use_adaptive=DEFAULT_PARAMS.get('use_adaptive_threshold', True),
+            verbose=verbose
+        )
+        if verbose:
+            logger.info("✨ Using improved transition detection (multi-derivative + adaptive)")
+    else:
+        transitions = find_optimal_transitions(area, verbose=verbose)
+        if verbose:
+            logger.info("📊 Using legacy transition detection")
+
     segments = []
     fit_errors = []
     
