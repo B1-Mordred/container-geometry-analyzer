@@ -17,7 +17,10 @@ import os
 def add_measurement_noise(values, noise_level=0.02):
     """Add realistic measurement noise (default 2%)."""
     noise = np.random.normal(0, noise_level * np.mean(values), len(values))
-    return values + noise
+    noisy_values = values + noise
+    # Ensure no negative values
+    noisy_values = np.maximum(noisy_values, 0.0)
+    return noisy_values
 
 
 def generate_cylinder(r, h_min, h_max, n_points=50, noise_level=0.02):
