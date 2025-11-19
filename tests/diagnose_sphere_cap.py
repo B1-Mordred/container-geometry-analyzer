@@ -143,19 +143,8 @@ try:
     print("\n[1/4] Loading CSV data...")
     df = load_data_csv(test_file, job=job, verbose=True)
     print(f"      Loaded {len(df)} data points")
-
-    # Get actual column names from the loaded dataframe
-    height_col = 'Height_mm' if 'Height_mm' in df.columns else 'height_mm'
-    volume_col = 'Volume_mL' if 'Volume_mL' in df.columns else 'volume_ml'
-
-    # If standard columns don't exist, try to find them
-    if height_col not in df.columns:
-        height_col = [c for c in df.columns if 'height' in c.lower()][0] if any('height' in c.lower() for c in df.columns) else df.columns[0]
-    if volume_col not in df.columns:
-        volume_col = [c for c in df.columns if 'volume' in c.lower()][0] if any('volume' in c.lower() for c in df.columns) else df.columns[1]
-
-    print(f"      Height range: {df[height_col].min():.2f} - {df[height_col].max():.2f} mm")
-    print(f"      Volume range: {df[volume_col].min():.2f} - {df[volume_col].max():.2f} mL")
+    print(f"      Height range: {df['Height_mm'].min():.2f} - {df['Height_mm'].max():.2f} mm")
+    print(f"      Volume range: {df['Volume_ml'].min():.2f} - {df['Volume_ml'].max():.2f} mL")
 
     # Step 2: Compute areas
     print("\n[2/4] Computing cross-sectional areas...")
