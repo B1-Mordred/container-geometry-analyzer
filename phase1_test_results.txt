@@ -1,0 +1,173 @@
+2025-11-19 22:31:18,696 - WARNING - ⚠️  ReportLab not available - install: pip install reportlab
+2025-11-19 22:31:18,697 - WARNING - ⚠️  Trimesh not available - install: pip install trimesh
+2025-11-19 22:31:18,698 - INFO - ℹ️  Tkinter not available - CLI mode only
+
+================================================================================
+GEOMETRY COMBINATION TEST SUITE
+================================================================================
+
+================================================================================
+Testing with Upper Cylinder Diameter = 10 mm (radius = 5.0 mm)
+================================================================================
+
+[1/4] Building: Sphere (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 2 segments: ['cone', 'frustum']
+
+[2/4] Building: Frustum (bottom) + Cylinder (top)
+    ✓ Detected 3 segments: ['cylinder', 'frustum', 'cylinder']
+
+[3/4] Building: Cone (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 3 segments: ['cone', 'frustum', 'cylinder']
+
+[4/4] Building: Semisphere (bottom) + Cylinder (top)
+    ✓ Detected 3 segments: ['frustum', 'frustum', 'cylinder']
+
+================================================================================
+Testing with Upper Cylinder Diameter = 12 mm (radius = 6.0 mm)
+================================================================================
+
+[1/4] Building: Sphere (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 3 segments: ['cone', 'frustum', 'frustum']
+
+[2/4] Building: Frustum (bottom) + Cylinder (top)
+    ✓ Detected 2 segments: ['frustum', 'cylinder']
+
+[3/4] Building: Cone (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 3 segments: ['cone', 'frustum', 'cylinder']
+
+[4/4] Building: Semisphere (bottom) + Cylinder (top)
+    ✓ Detected 2 segments: ['frustum', 'cylinder']
+
+================================================================================
+Testing with Upper Cylinder Diameter = 14 mm (radius = 7.0 mm)
+================================================================================
+
+[1/4] Building: Sphere (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 2 segments: ['frustum', 'frustum']
+
+[2/4] Building: Frustum (bottom) + Cylinder (top)
+    ✓ Detected 2 segments: ['cylinder', 'cylinder']
+
+[3/4] Building: Cone (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 3 segments: ['sphere_cap', 'frustum', 'cylinder']
+
+[4/4] Building: Semisphere (bottom) + Cylinder (top)
+    ✓ Detected 2 segments: ['frustum', 'cylinder']
+
+================================================================================
+Testing with Upper Cylinder Diameter = 16 mm (radius = 8.0 mm)
+================================================================================
+
+[1/4] Building: Sphere (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 2 segments: ['frustum', 'frustum']
+
+[2/4] Building: Frustum (bottom) + Cylinder (top)
+    ✓ Detected 3 segments: ['cylinder', 'frustum', 'cylinder']
+
+[3/4] Building: Cone (bottom) + Frustum (middle) + Cylinder (top)
+    ✓ Detected 3 segments: ['cone', 'frustum', 'cylinder']
+
+[4/4] Building: Semisphere (bottom) + Cylinder (top)
+    ✓ Detected 3 segments: ['frustum', 'frustum', 'cylinder']
+
+================================================================================
+RESULTS SUMMARY
+================================================================================
+
+Detection Accuracy by Combination:
+--------------------------------------------------------------------------------
+Sphere+Frustum+Cylinder(d=10)                      ✗ 2/3 segments: [cone, frustum]
+Frustum+Cylinder(d=10)                             ✗ 3/2 segments: [cylinder, frustum, cylinder]
+Cone+Frustum+Cylinder(d=10)                        ✓ 3/3 segments: [cone, frustum, cylinder]
+Semisphere+Cylinder(d=10)                          ✗ 3/2 segments: [frustum, frustum, cylinder]
+Sphere+Frustum+Cylinder(d=12)                      ✓ 3/3 segments: [cone, frustum, frustum]
+Frustum+Cylinder(d=12)                             ✓ 2/2 segments: [frustum, cylinder]
+Cone+Frustum+Cylinder(d=12)                        ✓ 3/3 segments: [cone, frustum, cylinder]
+Semisphere+Cylinder(d=12)                          ✓ 2/2 segments: [frustum, cylinder]
+Sphere+Frustum+Cylinder(d=14)                      ✗ 2/3 segments: [frustum, frustum]
+Frustum+Cylinder(d=14)                             ✓ 2/2 segments: [cylinder, cylinder]
+Cone+Frustum+Cylinder(d=14)                        ✓ 3/3 segments: [sphere_cap, frustum, cylinder]
+Semisphere+Cylinder(d=14)                          ✓ 2/2 segments: [frustum, cylinder]
+Sphere+Frustum+Cylinder(d=16)                      ✗ 2/3 segments: [frustum, frustum]
+Frustum+Cylinder(d=16)                             ✗ 3/2 segments: [cylinder, frustum, cylinder]
+Cone+Frustum+Cylinder(d=16)                        ✓ 3/3 segments: [cone, frustum, cylinder]
+Semisphere+Cylinder(d=16)                          ✗ 3/2 segments: [frustum, frustum, cylinder]
+
+================================================================================
+DETAILED ANALYSIS
+================================================================================
+
+Cone+Frustum+Cylinder:
+--------------------------------------------------------------------------------
+  Detection Rate: 4/4 (100%)
+    ✓ d=20mm: 3 segments detected
+    ✓ d=24mm: 3 segments detected
+    ✓ d=28mm: 3 segments detected
+    ✓ d=32mm: 3 segments detected
+
+Frustum+Cylinder:
+--------------------------------------------------------------------------------
+  Detection Rate: 2/4 (50%)
+    ✗ d=20mm: 3 segments detected
+    ✓ d=24mm: 2 segments detected
+    ✓ d=28mm: 2 segments detected
+    ✗ d=32mm: 3 segments detected
+
+Semisphere+Cylinder:
+--------------------------------------------------------------------------------
+  Detection Rate: 2/4 (50%)
+    ✗ d=20mm: 3 segments detected
+    ✓ d=24mm: 2 segments detected
+    ✓ d=28mm: 2 segments detected
+    ✗ d=32mm: 3 segments detected
+
+Sphere+Frustum+Cylinder:
+--------------------------------------------------------------------------------
+  Detection Rate: 1/4 (25%)
+    ✗ d=20mm: 2 segments detected
+    ✓ d=24mm: 3 segments detected
+    ✗ d=28mm: 2 segments detected
+    ✗ d=32mm: 2 segments detected
+
+================================================================================
+RECOMMENDATIONS FOR ALGORITHM IMPROVEMENT
+================================================================================
+
+❌ FAILURES DETECTED:
+
+  Sphere+Frustum+Cylinder(d=10)
+    Expected: 3 segments
+    Detected: 2 segments (['cone', 'frustum'])
+    Issue: Under-segmentation
+
+  Frustum+Cylinder(d=10)
+    Expected: 2 segments
+    Detected: 3 segments (['cylinder', 'frustum', 'cylinder'])
+    Issue: Over-segmentation
+
+  Semisphere+Cylinder(d=10)
+    Expected: 2 segments
+    Detected: 3 segments (['frustum', 'frustum', 'cylinder'])
+    Issue: Over-segmentation
+
+  Sphere+Frustum+Cylinder(d=14)
+    Expected: 3 segments
+    Detected: 2 segments (['frustum', 'frustum'])
+    Issue: Under-segmentation
+
+  Sphere+Frustum+Cylinder(d=16)
+    Expected: 3 segments
+    Detected: 2 segments (['frustum', 'frustum'])
+    Issue: Under-segmentation
+
+  Frustum+Cylinder(d=16)
+    Expected: 2 segments
+    Detected: 3 segments (['cylinder', 'frustum', 'cylinder'])
+    Issue: Over-segmentation
+
+  Semisphere+Cylinder(d=16)
+    Expected: 2 segments
+    Detected: 3 segments (['frustum', 'frustum', 'cylinder'])
+    Issue: Over-segmentation
+
+================================================================================

@@ -83,12 +83,74 @@ DEFAULT_PARAMS = {
     'debug_transitions': False,  # Set to True to see detailed transition detection output
 }
 
+# Priority 1: Size-Adaptive Parameters for Improved Detection Accuracy
+# Different container diameters require different algorithm parameters
+SIZE_ADAPTIVE_PARAMS = {
+    'small': {      # d < 12mm - Small containers with noise-sensitive small segments
+        'percentile': 92,           # More permissive (from 96) - easier to trigger transitions
+        'merge_threshold': 0.08,    # Stricter merging (from 0.12) - preserve small boundaries
+        'min_points': 8,            # More granular (from 12) - allow smaller segments
+        'variance_threshold': 0.12, # Lower (from 0.14) - more sensitive to changes
+        'transition_buffer': 2.0,   # Reduced from 2.5
+    },
+    'medium': {     # 12 ≤ d < 14mm - Medium containers (sweet spot, already optimized)
+        'percentile': 96,           # Keep current optimal value
+        'merge_threshold': 0.12,    # Keep current
+        'min_points': 12,           # Keep current
+        'variance_threshold': 0.14, # Keep current
+        'transition_buffer': 2.5,   # Keep current
+    },
+    'large': {      # d ≥ 14mm - Large containers with proportionally smaller noise
+        'percentile': 97,           # More selective (from 96) - higher bar for transitions
+        'merge_threshold': 0.15,    # Looser merging (from 0.12) - acceptable to combine similar segments
+        'min_points': 12,           # Keep current
+        'variance_threshold': 0.14, # Keep current
+        'transition_buffer': 2.5,   # Keep current
+    }
+}
+
 GEOMETRIC_CONSTRAINTS = {
     'min_differential_volume': 0.01,
     'radius_safety_margin': 0.8,
     'fit_bounds_lower': 0.5,
     'fit_bounds_upper': 3.0,
 }
+
+# Priority 1: Helper Functions for Size-Adaptive Parameters
+def get_size_category(diameter_mm: float) -> str:
+    """Determine size category based on container diameter.
+
+    Args:
+        diameter_mm: Container diameter in millimeters
+
+    Returns:
+        'small' (d < 12mm), 'medium' (12 ≤ d < 14mm), or 'large' (d ≥ 14mm)
+    """
+    if diameter_mm < 12.0:
+        return 'small'
+    elif diameter_mm < 14.0:
+        return 'medium'
+    else:
+        return 'large'
+
+
+def get_adaptive_params(diameter_mm: float) -> Dict:
+    """Get adaptive parameters for given container diameter.
+
+    Args:
+        diameter_mm: Container diameter in millimeters
+
+    Returns:
+        Dictionary with adaptive parameters merged into DEFAULT_PARAMS
+    """
+    category = get_size_category(diameter_mm)
+    params = DEFAULT_PARAMS.copy()
+
+    # Update with size-specific parameters
+    if category in SIZE_ADAPTIVE_PARAMS:
+        params.update(SIZE_ADAPTIVE_PARAMS[category])
+
+    return params
 
 # Job tracking class
 class AnalysisJob:
@@ -703,22 +765,38 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
 def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     """Main segmentation and fitting pipeline."""
     step_start = time.time()
-    
+
     if len(df_areas) < 10:
         warning_msg = "Limited data points - results may be approximate"
         warnings.warn(warning_msg)
         if job:
             job.add_warning(warning_msg)
-    
+
     area = df_areas['Area'].values
     heights = df_areas['Height_mm'].values
+
+    # === Priority 1: Size-Adaptive Parameters ===
+    # Estimate container diameter from cylinder area (top of container)
+    # Use median of top 10% of areas for robust estimate
+    top_area = np.median(area[-max(1, len(area)//10):]) if len(area) > 0 else area[-1]
+    estimated_radius = np.sqrt(max(top_area, 1.0) / np.pi)  # sqrt of positive value
+    estimated_diameter = estimated_radius * 2.0
+
+    # Get size-adaptive parameters
+    adaptive_params = get_adaptive_params(estimated_diameter)
+
+    if verbose:
+        size_cat = get_size_category(estimated_diameter)
+        logger.info(f"Container diameter estimate: {estimated_diameter:.1f}mm (category: {size_cat})")
+        logger.debug(f"  Using adaptive parameters: percentile={adaptive_params['percentile']}, "
+                    f"merge_threshold={adaptive_params['merge_threshold']}, min_points={adaptive_params['min_points']}")
 
     # Use improved or legacy transition detection
     if DEFAULT_PARAMS.get('transition_detection_method', 'legacy') == 'improved':
         transitions = find_optimal_transitions_improved(
             area,
             heights=heights,
-            min_points=DEFAULT_PARAMS['min_points'],
+            min_points=adaptive_params['min_points'],  # Use size-adaptive min_points
             use_adaptive=DEFAULT_PARAMS.get('use_adaptive_threshold', True),
             verbose=verbose
         )
@@ -727,9 +805,9 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     else:
         transitions = find_optimal_transitions(
             area,
-            min_points=DEFAULT_PARAMS['min_points'],
-            percentile=DEFAULT_PARAMS['percentile'],
-            variance_threshold=DEFAULT_PARAMS['variance_threshold'],
+            min_points=adaptive_params['min_points'],  # Use size-adaptive min_points
+            percentile=adaptive_params['percentile'],  # Use size-adaptive percentile
+            variance_threshold=adaptive_params['variance_threshold'],  # Use size-adaptive threshold
             verbose=verbose
         )
         if verbose:
@@ -741,8 +819,8 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     for i in range(len(transitions) - 1):
         start = transitions[i]
         end = transitions[i + 1]
-        
-        if end - start + 1 < DEFAULT_PARAMS['min_points']:
+
+        if end - start + 1 < adaptive_params['min_points']:  # Use adaptive min_points
             continue
         
         x = df_areas['Height_mm'].iloc[start:end + 1].values
@@ -920,6 +998,20 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     # === POST-PROCESSING: Intelligent segment merging ===
     # Merge adjacent frustum segments that are geometrically consistent
     # This reduces over-segmentation in linear regions
+    # Priority 1: Use adaptive merge threshold based on container size
+    merge_tolerance = adaptive_params['merge_threshold']
+
+    # Calculate merge tolerance for different shapes
+    # Frustum and Cone: use merge_tolerance as fraction of radius
+    # Cylinder: stricter tolerance (half of merge_tolerance)
+    frustum_tolerance = merge_tolerance  # e.g., 0.08, 0.12, or 0.15
+    cylinder_tolerance = merge_tolerance * 0.5  # e.g., 0.04, 0.06, or 0.075 (approximate 0.05)
+    cone_tolerance = merge_tolerance  # e.g., 0.08, 0.12, or 0.15
+
+    if verbose:
+        logger.debug(f"Merging tolerances: frustum={frustum_tolerance:.3f}, "
+                    f"cylinder={cylinder_tolerance:.3f}, cone={cone_tolerance:.3f}")
+
     merged_segments = []
     skip_indices = set()
 
@@ -952,7 +1044,7 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
                 # If ending radius of current ≈ starting radius of next, they're continuous
                 radius_diff = abs(r2_current - r1_next) / (max(r2_current, r1_next) + 1e-6)
 
-                if radius_diff < 0.1:  # Within 10% - consider them continuous
+                if radius_diff < frustum_tolerance:  # Use adaptive tolerance
                     # Merge: extend current segment to include next
                     current_end = next_end
                     # Update params to reflect merged segment
@@ -977,7 +1069,7 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
                 radius_diff = abs(r_current - r_next) / (max(r_current, r_next) + 1e-6)
 
-                if radius_diff < 0.05:  # Within 5% - consider same cylinder
+                if radius_diff < cylinder_tolerance:  # Use adaptive tolerance
                     current_end = next_end
                     merge_count += 1
                     skip_indices.add(i + merge_count)
@@ -993,7 +1085,7 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
                 radius_diff = abs(r_current - r_next) / (max(r_current, r_next) + 1e-6)
 
-                if radius_diff < 0.1:  # Within 10%
+                if radius_diff < cone_tolerance:  # Use adaptive tolerance
                     current_end = next_end
                     merge_count += 1
                     skip_indices.add(i + merge_count)
