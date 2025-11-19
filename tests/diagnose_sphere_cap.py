@@ -169,16 +169,11 @@ try:
     print("ANALYSIS COMPLETE")
     print("=" * 80)
     print(f"Duration: {summary['duration']:.2f} seconds")
-    print(f"Segments detected: {len(segments['transitions']) - 1}")
+    print(f"Segments detected: {len(segments)}")
     print()
 
     print("Segment details:")
-    for i in range(len(segments['transitions']) - 1):
-        start_idx = segments['transitions'][i]
-        end_idx = segments['transitions'][i + 1]
-        shape = segments['shapes'][i]
-        params = segments['params'][i]
-
+    for i, (start_idx, end_idx, shape, params) in enumerate(segments):
         h_start = df_areas.iloc[start_idx]['Height_mm']
         h_end = df_areas.iloc[end_idx]['Height_mm']
 
@@ -189,8 +184,8 @@ try:
     print("INTERPRETATION")
     print("=" * 80)
 
-    if len(segments['transitions']) == 2:  # Only 2 transitions = 1 segment (entire container)
-        shape = segments['shapes'][0]
+    if len(segments) == 1:  # Only 1 segment (entire container)
+        start_idx, end_idx, shape, params = segments[0]
         print(f"\n⚠️  SINGLE SEGMENT DETECTED: {shape}")
         print()
         print("This means the improved algorithm treated the entire container as ONE shape.")
@@ -208,16 +203,17 @@ try:
         else:
             print(f"  Shape: {shape}")
     else:
-        print(f"\n✓ MULTIPLE SEGMENTS DETECTED: {len(segments['transitions']) - 1} segments")
+        print(f"\n✓ MULTIPLE SEGMENTS DETECTED: {len(segments)} segments")
         print()
         print("This means the improved algorithm detected transitions within the container.")
         print("Each segment was fitted to its best matching shape.")
         print()
 
         # Check if any segment is sphere cap
-        if 'sphere_cap' in segments['shapes']:
-            sphere_cap_idx = segments['shapes'].index('sphere_cap')
-            print(f"✓ Segment {sphere_cap_idx} was identified as SPHERE CAP - good!")
+        shapes = [seg[2] for seg in segments]
+        if 'sphere_cap' in shapes:
+            sphere_cap_indices = [i for i, seg in enumerate(segments) if seg[2] == 'sphere_cap']
+            print(f"✓ Segment(s) {sphere_cap_indices} identified as SPHERE CAP - good!")
         else:
             print("ℹ️  No sphere cap segments detected")
 
