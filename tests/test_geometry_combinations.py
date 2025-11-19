@@ -238,6 +238,58 @@ def build_cone_frustum_cylinder(cone_r, frustum_r2, cylinder_r, n_points=100):
 
     return np.array(heights), np.array(volumes)
 
+def build_semisphere_cylinder(sphere_r, cylinder_r, n_points=100):
+    """Build a container with: semisphere (bottom) + cylinder (top)
+
+    A semisphere is a complete hemisphere (height = radius).
+    Provides a more practical test case than full sphere cap.
+    """
+    heights = []
+    volumes = []
+
+    # Semisphere: height from 0 to sphere_r (full hemisphere)
+    h_semi_start = 0.0
+    h_semi_end = sphere_r  # Hemisphere has height equal to radius
+    semi_points = int(n_points * 0.5)
+    h_semi_vals = np.linspace(h_semi_start, h_semi_end, semi_points)
+
+    current_volume = 0.0
+
+    for i, h in enumerate(h_semi_vals):
+        if i == 0:
+            heights.append(h)
+            volumes.append(current_volume)
+            continue
+
+        # Sphere cap volume formula: V = π*h²/3 * (3R - h)
+        # At height h, volume from apex
+        r_at_h = np.sqrt(sphere_r**2 - (sphere_r - h)**2)  # radius at this height
+        r_prev = np.sqrt(sphere_r**2 - (sphere_r - h_semi_vals[i-1])**2)
+
+        # Use small segment volume approximation
+        dh = h - h_semi_vals[i-1]
+        # Average of the two cross-sectional areas times height
+        area_curr = np.pi * r_at_h**2
+        area_prev = np.pi * r_prev**2
+        current_volume += (area_curr + area_prev) / 2 * dh
+
+        heights.append(h)
+        volumes.append(current_volume)
+
+    # Cylinder: must connect to sphere_r (the cylinder radius at top of hemisphere)
+    h_cyl_start = h_semi_end
+    h_cyl_end = h_cyl_start + 10.0  # 10mm cylinder height
+    cyl_points = int(n_points * 0.5)
+    h_cyl_vals = np.linspace(h_cyl_start, h_cyl_end, cyl_points)[1:]
+
+    for i, h in enumerate(h_cyl_vals):
+        dh = h - (h_cyl_vals[i-1] if i > 0 else h_cyl_start)
+        current_volume += np.pi * cylinder_r**2 * dh
+        heights.append(h)
+        volumes.append(current_volume)
+
+    return np.array(heights), np.array(volumes)
+
 # ============================================================================
 # TEST RUNNER
 # ============================================================================
@@ -320,7 +372,7 @@ if __name__ == '__main__':
         print(f"{'='*80}")
 
         # Test 1: Sphere + Frustum + Cylinder
-        print("\n[1/3] Building: Sphere (bottom) + Frustum (middle) + Cylinder (top)")
+        print("\n[1/4] Building: Sphere (bottom) + Frustum (middle) + Cylinder (top)")
         frustum_r1 = cyl_r + 1.5  # Bottom of frustum wider than top cylinder
         frustum_r2 = cyl_r        # Top of frustum matches cylinder
         sphere_r = 5.0
@@ -340,7 +392,7 @@ if __name__ == '__main__':
             })
 
         # Test 2: Frustum + Cylinder
-        print("\n[2/3] Building: Frustum (bottom) + Cylinder (top)")
+        print("\n[2/4] Building: Frustum (bottom) + Cylinder (top)")
         frustum_r1 = cyl_r + 1.0
         frustum_r2 = cyl_r
 
@@ -359,7 +411,7 @@ if __name__ == '__main__':
             })
 
         # Test 3: Cone + Frustum + Cylinder
-        print("\n[3/3] Building: Cone (bottom) + Frustum (middle) + Cylinder (top)")
+        print("\n[3/4] Building: Cone (bottom) + Frustum (middle) + Cylinder (top)")
         cone_r = 3.0  # Apex radius
         frustum_r2 = cyl_r
 
@@ -373,6 +425,24 @@ if __name__ == '__main__':
             print(f"    ✗ Error: {e}")
             results.append({
                 'combo': f"Cone+Frustum+Cylinder(d={cyl_d})",
+                'cyl_radius': cyl_r,
+                'error': str(e)
+            })
+
+        # Test 4: Semisphere + Cylinder
+        print("\n[4/4] Building: Semisphere (bottom) + Cylinder (top)")
+        sphere_r = cyl_r  # Hemisphere radius matches cylinder radius
+
+        try:
+            h, v = build_semisphere_cylinder(sphere_r, cyl_r, n_points=120)
+            v = add_realistic_noise(v, noise_level=0.005)
+            result = run_analysis(h, v, f"Semisphere+Cylinder(d={cyl_d})", cyl_d)
+            results.append(result)
+            print(f"    ✓ Detected {result['num_segments']} segments: {result['detected_shapes']}")
+        except Exception as e:
+            print(f"    ✗ Error: {e}")
+            results.append({
+                'combo': f"Semisphere+Cylinder(d={cyl_d})",
                 'cyl_radius': cyl_r,
                 'error': str(e)
             })
