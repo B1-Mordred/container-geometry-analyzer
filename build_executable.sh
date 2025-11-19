@@ -44,7 +44,7 @@ echo "Dependencies installed successfully"
 echo ""
 
 echo "[4/5] Building executable (this may take 2-5 minutes)..."
-pyinstaller build_exe.spec --distpath dist --workpath build --specpath .
+pyinstaller build_exe.spec --distpath dist --workpath build
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to build executable"
     exit 1
@@ -54,7 +54,6 @@ echo ""
 
 echo "[5/5] Cleaning up temporary files..."
 rm -rf build
-rm -f build_exe.spec.build
 echo ""
 
 echo "==============================================="
