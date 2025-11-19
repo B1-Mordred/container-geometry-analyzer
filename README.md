@@ -1,6 +1,6 @@
 # Container Geometry Analyzer  
 ### Volume–Height Analysis • Segment Detection • STL Generation • PDF Reporting  
-Version **3.11.8**
+Version **3.11.8 (FIXED)**
 
 ## Overview
 The **Container Geometry Analyzer** is a Python-based analysis tool that reconstructs 3D geometry of laboratory containers from **Volume–Height calibration data**.  
@@ -77,14 +77,16 @@ python container_geometry_analyzer_gui_v3_11_8_FIXED.py data.csv
 - Very sparse datasets may produce approximate fits  
 
 ## Version History
-### 3.11.8 
+### 3.11.8 (FIXED)
 - Fixed premature plot deletion (PDF error)  
 - Ensured stable temp file handling  
 - Improved export directory handling  
 - Enhanced logging  
 
 ### 3.11.7
+- Production-ready  
 - STL bottom closure  
 - Improved temp directory handling  
 
-
+## Support
+For further enhancements or integrations (HXX formats, robotics systems, pipeline automation), support is available.
