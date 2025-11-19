@@ -1,13 +1,8 @@
 """
-Container Geometry Analyzer - Enhanced PDF Reporting (v3.11.7_FINAL)
+Container Geometry Analyzer - Enhanced PDF Reporting (v3.11.8)
 ===============================================================
-Fixed: Use system temp directory for plot images (Windows compatibility)
-Fixed: Better error handling for plot generation
-STL bottom cap always closed
 
-Author: Laboratory Automation
-Version: 3.11.7 (WORKING - BytesIO + Paths Fixed)
-Date: 2025-11-18
+Author: Marco Horstmann
 """
 
 import pandas as pd
@@ -1194,7 +1189,7 @@ def launch_enhanced_gui():
         return
     
     root = tk.Tk()
-    root.title("Container Geometry Analyzer v3.11.7_FINAL - Production Ready")
+    root.title("Container Geometry Analyzer v3.11.8")
     root.geometry("750x550")
     
     def analyze_file():
@@ -1258,25 +1253,17 @@ Total Outputs: {summary['outputs_count']}
     ttk.Label(root, text="Container Geometry Analyzer", 
              font=("Arial", 18, "bold")).pack(pady=20)
     
-    ttk.Label(root, text="Version 3.11.3 - Production Ready", 
+    ttk.Label(root, text="Version 3.11.8", 
              font=("Arial", 12)).pack(pady=5)
     
     ttk.Button(root, text="📁 Select Volume-Height CSV", 
               command=analyze_file, width=40).pack(pady=30)
     
-    features_frame = ttk.LabelFrame(root, text="All Issues Fixed", padding=15)
+    features_frame = ttk.LabelFrame(root, text="", padding=15)
     features_frame.pack(pady=20, padx=20, fill='both', expand=True)
     
     features_text = """
-    ✅ STL bottom cap ALWAYS CLOSED at z=0
-    ✅ Uses system temp directory for plots (Windows safe)
-    ✅ Fixed NoneType formatting errors
-    ✅ Fixed path handling for all platforms
-    ✅ Comprehensive PDF reports with statistics
-    ✅ Job execution tracking and timing
-    ✅ Quality metrics and validation
-    ✅ 6-panel visualization suite
-    ✅ Professional formatting
+    
     """
     
     ttk.Label(features_frame, text=features_text, justify="left", 
