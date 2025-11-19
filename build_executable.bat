@@ -2,9 +2,14 @@
 REM Build script for Container Geometry Analyzer portable .exe
 REM This script creates a standalone executable that can run in air-gapped environments
 
+REM Change to the script directory
+cd /d "%~dp0"
+
 echo ===============================================
 echo Container Geometry Analyzer - Build Script
 echo ===============================================
+echo.
+echo Working directory: %CD%
 echo.
 
 REM Check if Python is installed

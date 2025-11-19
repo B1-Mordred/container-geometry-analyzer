@@ -30,7 +30,9 @@ MANIFEST
 
 # PyInstaller
 *.manifest
+# Note: build_exe.spec is NOT ignored - it's part of the build system
 *.spec
+!build_exe.spec
 
 # Unit test / coverage reports
 htmlcov/
