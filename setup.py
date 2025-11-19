@@ -16,7 +16,10 @@ version = "3.11.8"
 
 # Read long description from README
 here = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
+readme_path = os.path.join(here, 'README.md')
+if not os.path.exists(readme_path):
+    readme_path = os.path.join(here, 'doc', 'README.md')
+with open(readme_path, encoding='utf-8') as f:
     long_description = f.read()
 
 # Read requirements
@@ -42,8 +45,9 @@ setup(
     license='',  # Add license type when LICENSE file is created
 
     # Package configuration
-    py_modules=['container_geometry_analyzer_gui_v3_11_8'],
-    packages=find_packages(),
+    py_modules=['src.container_geometry_analyzer_gui_v3_11_8'],
+    packages=find_packages(include=['src', 'tests']),
+    package_dir={'': '.'},
     include_package_data=True,
 
     # Dependencies
