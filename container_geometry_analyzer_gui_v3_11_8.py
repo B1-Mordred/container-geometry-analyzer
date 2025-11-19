@@ -75,7 +75,7 @@ DEFAULT_PARAMS = {
     'merge_threshold': 0.05,
     'angular_resolution': 48,
     'maxfev': 4000,
-    'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - USING IMPROVED
+    'transition_detection_method': 'legacy',  # 'legacy' or 'improved' (multi-derivative) - USING LEGACY (better for composites)
     'use_adaptive_threshold': True,  # Adaptive SNR-based thresholds
     'use_multiscale': False,  # More thorough but slower
     'use_local_regression': True,  # Local polynomial regression for area computation
@@ -780,6 +780,44 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             # Sort by error (lowest first)
             fit_results.sort(key=lambda x: x[2])
             best_shape, best_params, best_error = fit_results[0]
+
+            # === CYLINDER PREFERENCE FIX ===
+            # If frustum is selected but r1 ≈ r2, prefer simpler cylinder model
+            if best_shape == 'frustum' and len(best_params) >= 2:
+                r1, r2 = float(best_params[0]), float(best_params[1])
+                r_max = max(r1, r2)
+                r_min = min(r1, r2)
+
+                if r_max > 0:
+                    relative_diff = abs(r2 - r1) / r_max
+
+                    # If radii are within 5%, this is essentially a cylinder
+                    if relative_diff < 0.05:
+                        # Find cylinder fit if it exists
+                        cylinder_fit = next((f for f in fit_results if f[0] == 'cylinder'), None)
+
+                        if cylinder_fit:
+                            cyl_shape, cyl_params, cyl_error = cylinder_fit
+
+                            # Prefer cylinder if error is within 20% of frustum error
+                            # (Allow slightly worse fit for simpler model)
+                            if cyl_error <= best_error * 1.2:
+                                best_shape = 'cylinder'
+                                best_params = cyl_params
+                                best_error = cyl_error
+
+                                if verbose:
+                                    logger.debug(f"Segment {i}: Preferring cylinder over near-cylindrical frustum "
+                                               f"(r1={r1:.2f}, r2={r2:.2f}, diff={relative_diff*100:.1f}%)")
+                        else:
+                            # No cylinder fit available, convert frustum to cylinder
+                            r_avg = (r1 + r2) / 2
+                            best_shape = 'cylinder'
+                            best_params = [r_avg]
+
+                            if verbose:
+                                logger.debug(f"Segment {i}: Converting near-cylindrical frustum to cylinder "
+                                           f"(r_avg={r_avg:.2f}mm)")
 
             segments.append((start, end, best_shape, best_params))
             fit_errors.append(best_error)
