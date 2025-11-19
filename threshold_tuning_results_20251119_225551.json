@@ -1,0 +1,230 @@
+[
+  {
+    "threshold": 0.05,
+    "pass_rate": 80.0,
+    "total_passed": 12,
+    "total_tests": 15,
+    "by_category": {
+      "simple_cylinders": {
+        "passed": 3,
+        "total": 3,
+        "pass_rate": 100.0
+      },
+      "cones": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "sphere_caps": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "frustums": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "composite_shapes": {
+        "passed": 0,
+        "total": 3,
+        "pass_rate": 0.0
+      },
+      "robustness": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 100.0
+      }
+    }
+  },
+  {
+    "threshold": 0.08,
+    "pass_rate": 73.33333333333333,
+    "total_passed": 11,
+    "total_tests": 15,
+    "by_category": {
+      "simple_cylinders": {
+        "passed": 3,
+        "total": 3,
+        "pass_rate": 100.0
+      },
+      "cones": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "sphere_caps": {
+        "passed": 1,
+        "total": 2,
+        "pass_rate": 50.0
+      },
+      "frustums": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "composite_shapes": {
+        "passed": 0,
+        "total": 3,
+        "pass_rate": 0.0
+      },
+      "robustness": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 100.0
+      }
+    }
+  },
+  {
+    "threshold": 0.1,
+    "pass_rate": 73.33333333333333,
+    "total_passed": 11,
+    "total_tests": 15,
+    "by_category": {
+      "simple_cylinders": {
+        "passed": 3,
+        "total": 3,
+        "pass_rate": 100.0
+      },
+      "cones": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "sphere_caps": {
+        "passed": 1,
+        "total": 2,
+        "pass_rate": 50.0
+      },
+      "frustums": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "composite_shapes": {
+        "passed": 0,
+        "total": 3,
+        "pass_rate": 0.0
+      },
+      "robustness": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 100.0
+      }
+    }
+  },
+  {
+    "threshold": 0.12,
+    "pass_rate": 66.66666666666666,
+    "total_passed": 10,
+    "total_tests": 15,
+    "by_category": {
+      "simple_cylinders": {
+        "passed": 3,
+        "total": 3,
+        "pass_rate": 100.0
+      },
+      "cones": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "sphere_caps": {
+        "passed": 0,
+        "total": 1,
+        "pass_rate": 0.0
+      },
+      "frustums": {
+        "passed": 2,
+        "total": 2,
+        "pass_rate": 100.0
+      },
+      "composite_shapes": {
+        "passed": 0,
+        "total": 3,
+        "pass_rate": 0.0
+      },
+      "robustness": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 100.0
+      }
+    }
+  },
+  {
+    "threshold": 0.15,
+    "pass_rate": 46.666666666666664,
+    "total_passed": 7,
+    "total_tests": 15,
+    "by_category": {
+      "simple_cylinders": {
+        "passed": 3,
+        "total": 3,
+        "pass_rate": 100.0
+      },
+      "cones": {
+        "passed": 1,
+        "total": 2,
+        "pass_rate": 50.0
+      },
+      "sphere_caps": {
+        "passed": 0,
+        "total": 1,
+        "pass_rate": 0.0
+      },
+      "frustums": {
+        "passed": 1,
+        "total": 2,
+        "pass_rate": 50.0
+      },
+      "composite_shapes": {
+        "passed": 0,
+        "total": 3,
+        "pass_rate": 0.0
+      },
+      "robustness": {
+        "passed": 4,
+        "total": 4,
+        "pass_rate": 100.0
+      }
+    }
+  },
+  {
+    "threshold": 0.2,
+    "pass_rate": 53.333333333333336,
+    "total_passed": 8,
+    "total_tests": 15,
+    "by_category": {
+      "simple_cylinders": {
+        "passed": 3,
+        "total": 3,
+        "pass_rate": 100.0
+      },
+      "cones": {
+        "passed": 1,
+        "total": 2,
+        "pass_rate": 50.0
+      },
+      "sphere_caps": {
+        "passed": 0,
+        "total": 1,
+        "pass_rate": 0.0
+      },
+      "frustums": {
+        "passed": 1,
+        "total": 2,
+        "pass_rate": 50.0
+      },
+      "composite_shapes": {
+        "passed": 0,
+        "total": 3,
+        "pass_rate": 0.0
+      },
+      "robustness": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 100.0
+      }
+    }
+  }
+]

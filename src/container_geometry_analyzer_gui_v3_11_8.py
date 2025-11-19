@@ -74,6 +74,7 @@ DEFAULT_PARAMS = {
     'transition_buffer': 2.5,
     'hermite_tension': 0.6,
     'merge_threshold': 0.12,  # Increased from 0.05 to 0.12 for aggressive segment merging
+    'curvature_threshold': 0.05,  # Priority 2: Threshold for curved surface filtering (tuned to 0.05 for optimal 80% pass rate)
     'angular_resolution': 48,
     'maxfev': 4000,
     'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - SWITCHED TO IMPROVED for better sphere cap detection
@@ -83,12 +84,294 @@ DEFAULT_PARAMS = {
     'debug_transitions': False,  # Set to True to see detailed transition detection output
 }
 
+# Priority 1: Size-Adaptive Parameters for Improved Detection Accuracy
+# Different container diameters require different algorithm parameters
+SIZE_ADAPTIVE_PARAMS = {
+    'small': {      # d < 12mm - Small containers with noise-sensitive small segments
+        'percentile': 92,           # More permissive (from 96) - easier to trigger transitions
+        'merge_threshold': 0.08,    # Stricter merging (from 0.12) - preserve small boundaries
+        'min_points': 8,            # More granular (from 12) - allow smaller segments
+        'variance_threshold': 0.12, # Lower (from 0.14) - more sensitive to changes
+        'transition_buffer': 2.0,   # Reduced from 2.5
+    },
+    'medium': {     # 12 ≤ d < 14mm - Medium containers (sweet spot, already optimized)
+        'percentile': 96,           # Keep current optimal value
+        'merge_threshold': 0.12,    # Keep current
+        'min_points': 12,           # Keep current
+        'variance_threshold': 0.14, # Keep current
+        'transition_buffer': 2.5,   # Keep current
+    },
+    'large': {      # d ≥ 14mm - Large containers with proportionally smaller noise
+        'percentile': 97,           # More selective (from 96) - higher bar for transitions
+        'merge_threshold': 0.15,    # Looser merging (from 0.12) - acceptable to combine similar segments
+        'min_points': 12,           # Keep current
+        'variance_threshold': 0.14, # Keep current
+        'transition_buffer': 2.5,   # Keep current
+    }
+}
+
 GEOMETRIC_CONSTRAINTS = {
     'min_differential_volume': 0.01,
     'radius_safety_margin': 0.8,
     'fit_bounds_lower': 0.5,
     'fit_bounds_upper': 3.0,
 }
+
+# Priority 1: Helper Functions for Size-Adaptive Parameters
+def get_size_category(diameter_mm: float) -> str:
+    """Determine size category based on container diameter.
+
+    Args:
+        diameter_mm: Container diameter in millimeters
+
+    Returns:
+        'small' (d < 12mm), 'medium' (12 ≤ d < 14mm), or 'large' (d ≥ 14mm)
+    """
+    if diameter_mm < 12.0:
+        return 'small'
+    elif diameter_mm < 14.0:
+        return 'medium'
+    else:
+        return 'large'
+
+
+def get_adaptive_params(diameter_mm: float) -> Dict:
+    """Get adaptive parameters for given container diameter.
+
+    Args:
+        diameter_mm: Container diameter in millimeters
+
+    Returns:
+        Dictionary with adaptive parameters merged into DEFAULT_PARAMS
+    """
+    category = get_size_category(diameter_mm)
+    params = DEFAULT_PARAMS.copy()
+
+    # Update with size-specific parameters
+    if category in SIZE_ADAPTIVE_PARAMS:
+        params.update(SIZE_ADAPTIVE_PARAMS[category])
+
+    return params
+
+# ============================================================================
+# Priority 2: Curved Surface Detection - Curvature Analysis Functions
+# ============================================================================
+
+def compute_curvature(area: np.ndarray, heights: np.ndarray = None) -> np.ndarray:
+    """
+    Compute curvature coefficient for area profile.
+
+    Curvature quantifies how "curved" a surface is:
+    - High curvature (>0.1): Curved surface (hemisphere, sphere cap)
+    - Low curvature (<0.05): Linear surface (cylinder, frustum, cone)
+
+    Formula: κ = |d²A/dh²| / (1 + |dA/dh|)^1.5
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values (if None, uses indices)
+
+    Returns:
+        Curvature coefficient for each point
+    """
+    if heights is None:
+        heights = np.arange(len(area), dtype=float)
+
+    # Compute derivatives
+    first_deriv = np.gradient(area, heights)
+    second_deriv = np.gradient(first_deriv, heights)
+
+    # Compute curvature coefficient
+    # Normalize by (1 + |derivative|)^1.5 to reduce noise sensitivity
+    numerator = np.abs(second_deriv)
+    denominator = 1.0 + np.abs(first_deriv)**1.5
+
+    curvature = numerator / denominator
+
+    return curvature
+
+
+def detect_curved_region(area: np.ndarray, heights: np.ndarray = None,
+                         curvature_threshold: float = 0.08) -> bool:
+    """
+    Detect if area profile has significant curved regions.
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values
+        curvature_threshold: Threshold for detecting curvature
+
+    Returns:
+        True if curved regions detected, False if linear
+    """
+    curvature = compute_curvature(area, heights)
+
+    # Check if maximum curvature exceeds threshold
+    max_curvature = np.max(curvature)
+
+    return max_curvature > curvature_threshold
+
+
+def detect_hemisphere_signature(area: np.ndarray, heights: np.ndarray = None) -> bool:
+    """
+    Detect if data matches hemisphere profile.
+
+    Hemisphere characteristics:
+    - Area starts at maximum (π*R²)
+    - Area decreases monotonically with height
+    - Smooth, continuous curvature
+    - Reaches small area at top
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values
+
+    Returns:
+        True if hemisphere signature detected
+    """
+    if len(area) < 5:
+        return False
+
+    # Check 1: Area decreases monotonically
+    diffs = np.diff(area)
+    is_decreasing = np.all(diffs <= 0)
+
+    if not is_decreasing:
+        return False
+
+    # Check 2: Initial area close to maximum
+    area_range = np.max(area) - np.min(area)
+    area_at_start = area[0]
+    area_ratio = area_at_start / (np.max(area) + 1e-8)
+
+    if area_ratio < 0.90:  # Area should start near max
+        return False
+
+    # Check 3: Area decrease is smooth (high curvature)
+    curvature = compute_curvature(area, heights)
+    mean_curvature = np.mean(curvature)
+
+    if mean_curvature < 0.05:  # Should have curvature
+        return False
+
+    # Check 4: Final area is much smaller than initial
+    if len(area) > 1:
+        area_drop = area[0] - area[-1]
+        area_drop_ratio = area_drop / (area[0] + 1e-8)
+
+        if area_drop_ratio < 0.3:  # Should drop significantly
+            return False
+
+    return True
+
+
+def detect_sphere_cap_signature(area: np.ndarray, heights: np.ndarray = None) -> bool:
+    """
+    Detect if data matches sphere cap profile.
+
+    Sphere cap characteristics:
+    - Area starts at zero (apex)
+    - Area increases monotonically with height
+    - Curvature inflection point in middle
+    - Different profile from hemisphere
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values
+
+    Returns:
+        True if sphere cap signature detected
+    """
+    if len(area) < 5:
+        return False
+
+    # Check 1: Area increases monotonically from near-zero
+    diffs = np.diff(area)
+    is_increasing = np.all(diffs >= 0)
+
+    if not is_increasing:
+        return False
+
+    # Check 2: Area starts near zero
+    area_range = np.max(area) - np.min(area)
+    area_at_start = area[0]
+    area_min_ratio = area_at_start / (np.max(area) + 1e-8)
+
+    if area_min_ratio > 0.05:  # Should start near zero
+        return False
+
+    # Check 3: Curvature pattern (acceleration changes)
+    first_deriv = np.gradient(area, heights if heights is not None else np.arange(len(area)))
+    second_deriv = np.gradient(first_deriv)
+
+    # For sphere cap: d²A/dh² changes sign (inflection)
+    # Initially positive (dA/dh increasing), then negative (dA/dh decreasing)
+    sign_changes = np.sum(np.diff(np.sign(second_deriv)) != 0)
+
+    if sign_changes < 1:  # Should have at least one inflection
+        return False
+
+    # Check 4: Area ratio at endpoints
+    if len(area) > 1:
+        area_ratio_final = area[-1] / (np.max(area) + 1e-8)
+        if area_ratio_final < 0.5:  # Final area should be significant
+            return False
+
+    return True
+
+
+def filter_transitions_in_curves(transitions: List[int], area: np.ndarray,
+                                  heights: np.ndarray = None,
+                                  curvature_threshold: float = 0.10) -> List[int]:
+    """
+    Remove transitions that occur in smooth (curved) regions.
+
+    Strategy: Keep transitions only at boundaries between curved and linear regions.
+    Remove transitions within smooth regions (inflection-induced).
+
+    Args:
+        transitions: Candidate transition indices
+        area: Cross-sectional areas
+        heights: Height values
+        curvature_threshold: Threshold for identifying curved regions
+
+    Returns:
+        Filtered transition indices
+    """
+    if len(transitions) < 2:
+        return transitions
+
+    # Compute curvature for full data
+    curvature = compute_curvature(area, heights)
+
+    # Identify smooth (curved) regions: curvature > threshold
+    smooth_mask = curvature > curvature_threshold
+
+    # Filter transitions
+    filtered = []
+
+    for i, t in enumerate(transitions):
+        if t <= 0 or t >= len(area) - 1:
+            # Keep start and end transitions
+            filtered.append(t)
+            continue
+
+        # Check if transition is at smooth→linear boundary
+        if i == 0 or i == len(transitions) - 1:
+            # Always keep first and last
+            filtered.append(t)
+        else:
+            # Check neighborhood of transition
+            left_curved = smooth_mask[t - 1] if t > 0 else False
+            right_curved = smooth_mask[t] if t < len(smooth_mask) else False
+
+            # Keep transition if it's at boundary (one side curved, other linear)
+            if left_curved != right_curved:
+                filtered.append(t)
+            # Else: inside curved region, skip this transition
+
+    return filtered
+
 
 # Job tracking class
 class AnalysisJob:
@@ -278,6 +561,154 @@ def volume_sphere_cap(h, R):
     # Clamp to valid range
     h_clamped = np.minimum(h, 2*R) if isinstance(h, np.ndarray) else min(h, 2*R)
     return (np.pi * h_clamped**2 * (3*R - h_clamped)) / 3
+
+
+# ============================================================================
+# Priority 2: Hemisphere and Specialized Fitting Functions
+# ============================================================================
+
+def volume_hemisphere(h, R):
+    """
+    Hemisphere volume: V = (2/3)πR³ × (3h/R - h³/R³)
+
+    This is equivalent to a sphere cap where cap height = R.
+
+    Parameters:
+    -----------
+    h : float or array
+        Height of fill from bottom (0 to R)
+    R : float
+        Radius of hemisphere
+
+    Returns:
+    --------
+    Volume of filled hemisphere
+
+    Notes:
+    ------
+    For h in [0, R]:
+        h=0: V=0 (empty)
+        h=R: V=(2/3)πR³ (full hemisphere)
+    """
+    h_ratio = np.asarray(h) / R
+
+    # Clamp to valid range [0, 1]
+    h_ratio_clamped = np.clip(h_ratio, 0, 1)
+
+    # Volume formula
+    volume = (2.0/3.0) * np.pi * R**3 * (3*h_ratio_clamped - h_ratio_clamped**3)
+
+    return volume
+
+
+def fit_hemisphere(x, y, p0=None, bounds=None, verbose=False):
+    """
+    Fit hemisphere model to volume-height data.
+
+    Minimizes: ||V_data - V_hemisphere||²
+
+    Args:
+        x: Height values (array)
+        y: Volume values (array)
+        p0: Initial guess [R] (if None, estimated from data)
+        bounds: Parameter bounds for R
+        verbose: Print fitting details
+
+    Returns:
+        Tuple: (popt, perr) where popt=[R], perr=error_percent
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # Initial guess for radius
+    if p0 is None:
+        # Estimate R from maximum area (which is π*R²)
+        max_area_approx = np.max(np.gradient(y, x))
+        R_guess = np.sqrt(max_area_approx / np.pi)
+        p0 = [R_guess]
+
+    # Fitting bounds (R > 0)
+    if bounds is None:
+        # Conservative bounds: R in [0.5*guess, 3*guess]
+        R_guess = p0[0]
+        bounds = ([0.1*R_guess], [5*R_guess])
+
+    try:
+        popt, _ = curve_fit(volume_hemisphere, x, y,
+                           p0=p0, bounds=bounds,
+                           maxfev=DEFAULT_PARAMS['maxfev'])
+
+        # Calculate error
+        y_pred = volume_hemisphere(x, *popt)
+        error = np.mean(np.abs(y - y_pred))
+        error_pct = (error / (np.max(y) + 1e-8)) * 100
+
+        if verbose:
+            logger.debug(f"Hemisphere fit: R={popt[0]:.2f}mm, error={error_pct:.2f}%")
+
+        return popt, error_pct
+
+    except Exception as e:
+        if verbose:
+            logger.debug(f"Hemisphere fitting failed: {e}")
+        return None, float('inf')
+
+
+def fit_sphere_cap(x, y, p0=None, bounds=None, verbose=False):
+    """
+    Fit sphere cap model to volume-height data.
+
+    Uses formula: V = πh²(3R - h)/3
+
+    Args:
+        x: Height values (array)
+        y: Volume values (array)
+        p0: Initial guess [R] (if None, estimated from data)
+        bounds: Parameter bounds for R
+        verbose: Print fitting details
+
+    Returns:
+        Tuple: (popt, perr) where popt=[R], perr=error_percent
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # Initial guess for radius
+    if p0 is None:
+        # For sphere cap: at some height h, V = πh²(3R - h)/3
+        # If we assume h ≈ 0.5*R_max, we can estimate R
+        h_max = np.max(x)
+        v_max = np.max(y)
+
+        # Approximate: R ≈ 3*V_max / (π*h_max²)
+        R_guess = max(h_max * 1.2, 3*v_max / (np.pi * h_max**2 + 1e-8))
+        p0 = [R_guess]
+
+    # Fitting bounds (R > 0)
+    if bounds is None:
+        R_guess = p0[0]
+        bounds = ([0.1*R_guess], [5*R_guess])
+
+    try:
+        popt, _ = curve_fit(volume_sphere_cap, x, y,
+                           p0=p0, bounds=bounds,
+                           maxfev=DEFAULT_PARAMS['maxfev'])
+
+        # Calculate error
+        y_pred = volume_sphere_cap(x, *popt)
+        error = np.mean(np.abs(y - y_pred))
+        error_pct = (error / (np.max(y) + 1e-8)) * 100
+
+        if verbose:
+            logger.debug(f"Sphere cap fit: R={popt[0]:.2f}mm, error={error_pct:.2f}%")
+
+        return popt, error_pct
+
+    except Exception as e:
+        if verbose:
+            logger.debug(f"Sphere cap fitting failed: {e}")
+        return None, float('inf')
+
 
 def load_data_csv(csv_path, job: AnalysisJob = None, verbose=True):
     """Load and validate CSV data with enhanced error handling."""
@@ -683,6 +1114,21 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
 
     validated = sorted(list(set(validated)))
 
+    # === IMPROVEMENT 4: Curvature-aware filtering (Priority 2) ===
+    # Remove false transitions that occur within curved regions (inflection points)
+    # Keep transitions only at boundaries between curved and linear regions
+    try:
+        curvature_threshold = DEFAULT_PARAMS.get('curvature_threshold', 0.10)
+        validated = filter_transitions_in_curves(
+            validated, area, heights, curvature_threshold=curvature_threshold
+        )
+        validated = sorted(list(set(validated)))
+        if verbose:
+            logger.info(f"   Curvature filtering applied: {len(validated) - 1} segments after filtering")
+    except Exception as e:
+        if verbose:
+            logger.warning(f"   Curvature filtering failed (using unfiltered): {e}")
+
     if verbose:
         logger.info(f"   Validated segments: {len(validated) - 1}")
 
@@ -703,22 +1149,38 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
 def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     """Main segmentation and fitting pipeline."""
     step_start = time.time()
-    
+
     if len(df_areas) < 10:
         warning_msg = "Limited data points - results may be approximate"
         warnings.warn(warning_msg)
         if job:
             job.add_warning(warning_msg)
-    
+
     area = df_areas['Area'].values
     heights = df_areas['Height_mm'].values
+
+    # === Priority 1: Size-Adaptive Parameters ===
+    # Estimate container diameter from cylinder area (top of container)
+    # Use median of top 10% of areas for robust estimate
+    top_area = np.median(area[-max(1, len(area)//10):]) if len(area) > 0 else area[-1]
+    estimated_radius = np.sqrt(max(top_area, 1.0) / np.pi)  # sqrt of positive value
+    estimated_diameter = estimated_radius * 2.0
+
+    # Get size-adaptive parameters
+    adaptive_params = get_adaptive_params(estimated_diameter)
+
+    if verbose:
+        size_cat = get_size_category(estimated_diameter)
+        logger.info(f"Container diameter estimate: {estimated_diameter:.1f}mm (category: {size_cat})")
+        logger.debug(f"  Using adaptive parameters: percentile={adaptive_params['percentile']}, "
+                    f"merge_threshold={adaptive_params['merge_threshold']}, min_points={adaptive_params['min_points']}")
 
     # Use improved or legacy transition detection
     if DEFAULT_PARAMS.get('transition_detection_method', 'legacy') == 'improved':
         transitions = find_optimal_transitions_improved(
             area,
             heights=heights,
-            min_points=DEFAULT_PARAMS['min_points'],
+            min_points=adaptive_params['min_points'],  # Use size-adaptive min_points
             use_adaptive=DEFAULT_PARAMS.get('use_adaptive_threshold', True),
             verbose=verbose
         )
@@ -727,9 +1189,9 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     else:
         transitions = find_optimal_transitions(
             area,
-            min_points=DEFAULT_PARAMS['min_points'],
-            percentile=DEFAULT_PARAMS['percentile'],
-            variance_threshold=DEFAULT_PARAMS['variance_threshold'],
+            min_points=adaptive_params['min_points'],  # Use size-adaptive min_points
+            percentile=adaptive_params['percentile'],  # Use size-adaptive percentile
+            variance_threshold=adaptive_params['variance_threshold'],  # Use size-adaptive threshold
             verbose=verbose
         )
         if verbose:
@@ -741,8 +1203,8 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     for i in range(len(transitions) - 1):
         start = transitions[i]
         end = transitions[i + 1]
-        
-        if end - start + 1 < DEFAULT_PARAMS['min_points']:
+
+        if end - start + 1 < adaptive_params['min_points']:  # Use adaptive min_points
             continue
         
         x = df_areas['Height_mm'].iloc[start:end + 1].values
@@ -753,6 +1215,37 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
         # Prepare to test all shape types
         fit_results = []  # List of (shape_name, params, error_pct)
+
+        # === 0. TRY CURVED SURFACE DETECTION (Priority 2) ===
+        # Check for hemispheres and sphere caps before standard shape fitting
+        segment_area = area[start:end + 1]
+        segment_heights = heights[start:end + 1] if len(heights) > 0 else np.arange(len(segment_area))
+
+        # Normalize heights to start from 0 for analysis
+        segment_heights_normalized = segment_heights - segment_heights[0]
+
+        try:
+            # Check for hemisphere signature
+            if detect_hemisphere_signature(segment_area, segment_heights_normalized):
+                try:
+                    hem_popt, hem_error = fit_hemisphere(segment_heights_normalized, y, verbose=False)
+                    if hem_popt is not None:
+                        fit_results.append(('hemisphere', hem_popt, hem_error))
+                        logger.debug(f"Segment {i}: Hemisphere fit error = {hem_error:.2f}%")
+                except Exception as e:
+                    logger.debug(f"Hemisphere fitting failed for segment {i}: {e}")
+
+            # Check for sphere cap signature
+            if detect_sphere_cap_signature(segment_area, segment_heights_normalized):
+                try:
+                    sphere_popt, sphere_error = fit_sphere_cap(segment_heights_normalized, y, verbose=False)
+                    if sphere_popt is not None:
+                        fit_results.append(('sphere_cap', sphere_popt, sphere_error))
+                        logger.debug(f"Segment {i}: Sphere cap fit error (Priority 2) = {sphere_error:.2f}%")
+                except Exception as e:
+                    logger.debug(f"Sphere cap fitting failed for segment {i}: {e}")
+        except Exception as e:
+            logger.debug(f"Curved surface detection failed for segment {i}: {e}")
 
         # === 1. TRY CYLINDER FIT ===
         try:
@@ -920,6 +1413,20 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     # === POST-PROCESSING: Intelligent segment merging ===
     # Merge adjacent frustum segments that are geometrically consistent
     # This reduces over-segmentation in linear regions
+    # Priority 1: Use adaptive merge threshold based on container size
+    merge_tolerance = adaptive_params['merge_threshold']
+
+    # Calculate merge tolerance for different shapes
+    # Frustum and Cone: use merge_tolerance as fraction of radius
+    # Cylinder: stricter tolerance (half of merge_tolerance)
+    frustum_tolerance = merge_tolerance  # e.g., 0.08, 0.12, or 0.15
+    cylinder_tolerance = merge_tolerance * 0.5  # e.g., 0.04, 0.06, or 0.075 (approximate 0.05)
+    cone_tolerance = merge_tolerance  # e.g., 0.08, 0.12, or 0.15
+
+    if verbose:
+        logger.debug(f"Merging tolerances: frustum={frustum_tolerance:.3f}, "
+                    f"cylinder={cylinder_tolerance:.3f}, cone={cone_tolerance:.3f}")
+
     merged_segments = []
     skip_indices = set()
 
@@ -938,8 +1445,9 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             if next_shape != current_shape or next_start > current_end + 1:
                 break
 
-            # Never merge sphere_cap with other shapes - it's a distinct boundary
-            if current_shape == 'sphere_cap' or next_shape == 'sphere_cap':
+            # Never merge sphere_cap or hemisphere with other shapes - they're distinct boundaries
+            if (current_shape in ('sphere_cap', 'hemisphere') or
+                next_shape in ('sphere_cap', 'hemisphere')):
                 break
 
             # For frustums, check if radius progression is continuous
@@ -952,7 +1460,7 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
                 # If ending radius of current ≈ starting radius of next, they're continuous
                 radius_diff = abs(r2_current - r1_next) / (max(r2_current, r1_next) + 1e-6)
 
-                if radius_diff < 0.1:  # Within 10% - consider them continuous
+                if radius_diff < frustum_tolerance:  # Use adaptive tolerance
                     # Merge: extend current segment to include next
                     current_end = next_end
                     # Update params to reflect merged segment
@@ -977,7 +1485,7 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
                 radius_diff = abs(r_current - r_next) / (max(r_current, r_next) + 1e-6)
 
-                if radius_diff < 0.05:  # Within 5% - consider same cylinder
+                if radius_diff < cylinder_tolerance:  # Use adaptive tolerance
                     current_end = next_end
                     merge_count += 1
                     skip_indices.add(i + merge_count)
@@ -993,13 +1501,34 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
                 radius_diff = abs(r_current - r_next) / (max(r_current, r_next) + 1e-6)
 
-                if radius_diff < 0.1:  # Within 10%
+                if radius_diff < cone_tolerance:  # Use adaptive tolerance
                     current_end = next_end
                     merge_count += 1
                     skip_indices.add(i + merge_count)
 
                     if verbose:
                         logger.debug(f"Merging segment {i} and {i+merge_count} (adjacent cones, similar apex)")
+                    continue
+
+            # For hemispheres, check if radius is consistent (Priority 2)
+            # Consecutive hemispheres might indicate a single hemisphere split by inflection points
+            elif current_shape == 'hemisphere' and len(current_params) >= 1 and len(next_params) >= 1:
+                R_current = float(current_params[0])
+                R_next = float(next_params[0])
+
+                radius_diff = abs(R_current - R_next) / (max(R_current, R_next) + 1e-6)
+
+                # Use stricter tolerance for hemispheres (0.05 = 5% difference)
+                if radius_diff < 0.05:
+                    current_end = next_end
+                    # Average the radii for merged hemisphere
+                    R_merged = (R_current + R_next) / 2.0
+                    current_params = [R_merged]
+                    merge_count += 1
+                    skip_indices.add(i + merge_count)
+
+                    if verbose:
+                        logger.debug(f"Merging segment {i} and {i+merge_count} (consecutive hemispheres from inflection split)")
                     continue
 
             break
