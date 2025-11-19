@@ -4,18 +4,28 @@ PyInstaller specification file for Container Geometry Analyzer
 This creates a standalone .exe for Windows that can run in air-gapped environments.
 
 Build with: pyinstaller build_exe.spec
+Note: Must be run from the project root directory
 """
 
 import sys
 import os
 
-# Get the directory where this spec file is located
-spec_dir = os.path.dirname(os.path.abspath(__file__))
+# Get the project directory - assumes script is run from project root
+# This is more robust than using __file__ which may not be defined in spec context
+spec_dir = os.path.abspath(os.getcwd())
+
+# Verify we're in the right directory
+if not os.path.exists(os.path.join(spec_dir, 'src')):
+    raise RuntimeError(
+        f"Error: Must run from project root directory.\n"
+        f"Current: {spec_dir}\n"
+        f"Expected: directory containing 'src/' subdirectory"
+    )
 
 block_cipher = None
 
 a = Analysis(
-    [os.path.join(spec_dir, 'src/container_geometry_analyzer_gui_v3_11_8.py')],
+    [os.path.join(spec_dir, 'src', 'container_geometry_analyzer_gui_v3_11_8.py')],
     pathex=[spec_dir],
     binaries=[],
     datas=[
