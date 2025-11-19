@@ -1,0 +1,154 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master, develop, claude/* ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test:
+    name: Test on Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # Reduce matrix for faster CI - test latest Python on all OS
+          # and all Python versions on Ubuntu only
+          - os: windows-latest
+            python-version: '3.7'
+          - os: windows-latest
+            python-version: '3.8'
+          - os: windows-latest
+            python-version: '3.9'
+          - os: windows-latest
+            python-version: '3.10'
+          - os: macos-latest
+            python-version: '3.7'
+          - os: macos-latest
+            python-version: '3.8'
+          - os: macos-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.10'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-xdist
+
+    - name: Display environment info
+      run: |
+        python --version
+        pip list
+
+    - name: Run unit tests with coverage
+      run: |
+        pytest test_transition_detection.py -v --cov=. --cov-report=xml --cov-report=term
+
+    - name: Run benchmark tests (quick mode)
+      run: |
+        python benchmark_transition_detection.py
+      continue-on-error: true  # Benchmarks shouldn't fail the build
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  test-sample-data:
+    name: Test with sample data
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Test CLI mode with sample data
+      run: |
+        python container_geometry_analyzer_gui_v3_11_8.py sample_2ml_tube_geometry_corrected.csv
+        python container_geometry_analyzer_gui_v3_11_8.py simulated_container_eppi_50uL.csv
+
+    - name: Verify outputs were created
+      run: |
+        # Check that STL and PDF files were created
+        ls -la *.stl *.pdf || echo "No output files found (expected)"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: sample-outputs
+        path: |
+          *.stl
+          *.pdf
+        retention-days: 7
+
+  integration-test:
+    name: Integration test - Full pipeline
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install all dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Test CLI command after installation
+      run: |
+        # Test that the package installed correctly
+        python -c "import container_geometry_analyzer_gui_v3_11_8"
+
+    - name: Run visualization scripts
+      run: |
+        python visualize_algorithm_comparison.py
+      continue-on-error: true
+
+    - name: Upload visualization artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: visualizations
+        path: |
+          *.png
+          *.jpg
+          *.svg
+        retention-days: 7

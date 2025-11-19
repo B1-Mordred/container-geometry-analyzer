@@ -1,0 +1,123 @@
+# Container Geometry Analyzer - Git Ignore File
+# ===============================================
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Project specific outputs
+# ========================
+
+# Generated output files
+*.stl
+*.pdf
+ContainerReport_*.pdf
+*_model_*.stl
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Plots and visualizations
+*.png
+*.jpg
+*.jpeg
+*.svg
+!docs/*.png
+!docs/*.jpg
+!docs/*.svg
+
+# Data files (comment out if you want to track sample data)
+# *.csv
+
+# Logs
+*.log
+logs/
+
+# Benchmark results
+benchmark_results/
+*.benchmark
+
+# Build artifacts
+*.pyc
+*.pyo
+*.pyd
+
+# OS specific
+Thumbs.db
+.DS_Store
