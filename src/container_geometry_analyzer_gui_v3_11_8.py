@@ -76,10 +76,11 @@ DEFAULT_PARAMS = {
     'merge_threshold': 0.05,
     'angular_resolution': 48,
     'maxfev': 4000,
-    'transition_detection_method': 'legacy',  # 'legacy' or 'improved' (multi-derivative) - USING LEGACY (better for composites)
+    'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - SWITCHED TO IMPROVED for better sphere cap detection
     'use_adaptive_threshold': True,  # Adaptive SNR-based thresholds
     'use_multiscale': False,  # More thorough but slower
     'use_local_regression': True,  # Local polynomial regression for area computation
+    'debug_transitions': False,  # Set to True to see detailed transition detection output
 }
 
 GEOMETRIC_CONSTRAINTS = {
@@ -683,6 +684,18 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
     if verbose:
         logger.info(f"   Validated segments: {len(validated) - 1}")
 
+        # DEBUG: Show curvature information if requested
+        if DEFAULT_PARAMS.get('debug_transitions', False):
+            logger.debug("=" * 70)
+            logger.debug("TRANSITION DETECTION DEBUG INFO")
+            logger.debug("=" * 70)
+            logger.debug(f"First derivative (dA/dh) range: {np.min(first_deriv):.6f} to {np.max(first_deriv):.6f}")
+            logger.debug(f"Second derivative (d²A/dh²) range: {np.min(second_deriv):.6f} to {np.max(second_deriv):.6f}")
+            logger.debug(f"Combined score range: {np.min(score):.6f} to {np.max(score):.6f}")
+            logger.debug(f"Threshold used: {threshold:.6f}")
+            logger.debug(f"Transitions found: {validated}")
+            logger.debug("=" * 70)
+
     return validated
 
 def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
@@ -821,6 +834,13 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             # Sort by error (lowest first)
             fit_results.sort(key=lambda x: x[2])
             best_shape, best_params, best_error = fit_results[0]
+
+            # DEBUG: Show fit comparisons if requested
+            if DEFAULT_PARAMS.get('debug_transitions', False):
+                logger.debug(f"\nSegment {i} ({start}-{end}): Fit comparison:")
+                for shape_name, _, error_pct in fit_results:
+                    marker = "✓ SELECTED" if shape_name == best_shape else ""
+                    logger.debug(f"  {shape_name:<15} error: {error_pct:6.2f}% {marker}")
 
             # === CYLINDER PREFERENCE FIX ===
             # If frustum is selected but r1 ≈ r2, prefer simpler cylinder model
