@@ -578,6 +578,8 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
             return np.zeros_like(arr)
         return (arr - arr_min) / (arr_max - arr_min)
 
+    # Score combines 1st derivative changes with 2nd derivative (curvature)
+    # Balance between change detection (linear segments) and curvature (curved segments)
     score = (0.6 * normalize_score(first_deriv_change) +
              0.4 * normalize_score(second_deriv_abs))
 
@@ -607,7 +609,7 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
         if verbose:
             logger.info(f"   SNR: {snr:.2f}, adaptive percentile: {percentile}")
     else:
-        percentile = 80  # Legacy default
+        percentile = 96  # Use optimized default (from earlier tuning)
 
     threshold = np.percentile(score, percentile)
 
