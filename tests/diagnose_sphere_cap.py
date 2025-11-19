@@ -7,6 +7,7 @@ Run with: python diagnose_sphere_cap.py
 import sys
 import os
 import logging
+import tempfile
 
 # Setup logging to show DEBUG output
 logging.basicConfig(
@@ -108,13 +109,16 @@ print("SPHERE CAP CONTAINER DIAGNOSTICS")
 print("=" * 80)
 print()
 
-# Save test data to temp file
-test_file = "/tmp/sphere_cap_test.csv"
-with open(test_file, 'w') as f:
-    f.write(sphere_cap_csv)
+# Create temp file in cross-platform way
+temp_dir = tempfile.gettempdir()
+test_file = os.path.join(temp_dir, 'sphere_cap_test.csv')
 
 print(f"Test data saved to: {test_file}")
 print()
+
+# Save test data to temp file
+with open(test_file, 'w') as f:
+    f.write(sphere_cap_csv)
 
 # Enable debug mode
 print("=" * 80)
