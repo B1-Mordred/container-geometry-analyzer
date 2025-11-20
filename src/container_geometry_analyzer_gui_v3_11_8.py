@@ -424,42 +424,58 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
         # Convert area to radius
         radius = np.sqrt(area / np.pi)
 
-        # === Phase 3: Aggressive smoothing for real containers with measurement noise ===
-        # Real containers show high-frequency oscillations from measurement artifacts
-        # Use multi-stage filtering: Savitzky-Golay (feature-preserving) + Gaussian (noise reduction)
-        from scipy.ndimage import gaussian_filter1d
+        # === Phase 3: EXTREMELY aggressive smoothing for real containers with heavy measurement noise ===
+        # Real containers show significant high-frequency oscillations (±1-2mm)
+        # Use multi-stage approach: Median → Savitzky-Golay → Multiple Gaussian passes
+        from scipy.ndimage import gaussian_filter1d, median_filter
         from scipy.signal import savgol_filter
 
         # Create smoothed reference profile
         if len(radius) >= 7:
             try:
-                # Stage 1: Aggressive Savitzky-Golay with larger window and low polynomial order
-                # Larger window removes more noise while preserving overall shape
-                # Polynomial order 2 avoids overfitting to noise
-                window_length = max(7, (len(radius) // 4) * 2 + 1)  # Larger window: len/4, ensure odd
-                window_length = min(window_length, len(radius) - 1)  # Can't exceed data length
+                # Stage 0: Median filter to remove spikes/outliers
+                # Helps clean data before polynomial fitting
+                radius_median = median_filter(radius, size=max(3, len(radius) // 15))
+
+                # Stage 1: MUCH larger Savitzky-Golay window (aggressive)
+                # Use len//3 or len//2 for strong smoothing
+                window_length = max(11, (len(radius) // 3) * 2 + 1)
+                window_length = min(window_length, len(radius) - 2)
                 if window_length % 2 == 0:
                     window_length -= 1  # Must be odd
 
                 try:
-                    radius_smooth_sg = savgol_filter(radius, window_length, polyorder=2)
+                    radius_smooth_sg = savgol_filter(radius_median, window_length, polyorder=1)
                 except Exception:
-                    # If window too large, reduce it
-                    window_length = max(7, (len(radius) // 5) * 2 + 1)
+                    # If fails, use even more aggressive window
+                    window_length = max(11, (len(radius) // 2) * 2 + 1)
+                    window_length = min(window_length, len(radius) - 2)
                     if window_length % 2 == 0:
                         window_length -= 1
-                    radius_smooth_sg = savgol_filter(radius, window_length, polyorder=2)
+                    try:
+                        radius_smooth_sg = savgol_filter(radius_median, window_length, polyorder=1)
+                    except Exception:
+                        # Ultimate fallback
+                        radius_smooth_sg = radius_median.copy()
 
-                # Stage 2: Additional Gaussian smoothing to further reduce high-frequency noise
-                # Sigma based on profile noise level (estimate from gradient)
+                # Stage 2: STRONG Gaussian smoothing with much larger sigma
+                # Multiple passes for cumulative smoothing
                 gradient_rms = np.sqrt(np.mean(np.gradient(radius)**2))
-                sigma = max(0.5, min(2.0, gradient_rms * 0.5))  # Adaptive sigma
+                # Much more aggressive sigma: base 2.0 + gradient contribution
+                sigma = max(1.5, min(4.0, 2.0 + gradient_rms * 0.3))
+
+                # First Gaussian pass
                 radius_smooth_sg = gaussian_filter1d(radius_smooth_sg, sigma=sigma)
 
+                # Stage 3: Second Gaussian pass for even stronger smoothing
+                # Reduces remaining oscillations
+                radius_smooth_sg = gaussian_filter1d(radius_smooth_sg, sigma=sigma * 0.7)
+
             except Exception as e:
-                # Fallback: Strong Gaussian smoothing
-                logger.debug(f"Savitzky-Golay failed, using Gaussian: {e}")
-                radius_smooth_sg = gaussian_filter1d(radius, sigma=1.5)
+                # Ultimate fallback: Very strong single-stage Gaussian
+                logger.debug(f"Multi-stage smoothing failed, using heavy Gaussian: {e}")
+                radius_smooth_sg = gaussian_filter1d(radius, sigma=3.0)
+                radius_smooth_sg = gaussian_filter1d(radius_smooth_sg, sigma=2.0)
         else:
             radius_smooth_sg = radius.copy()
 
