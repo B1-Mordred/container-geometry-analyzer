@@ -74,7 +74,8 @@ DEFAULT_PARAMS = {
     'transition_buffer': 2.5,
     'hermite_tension': 0.6,
     'merge_threshold': 0.12,  # Increased from 0.05 to 0.12 for aggressive segment merging
-    'curvature_threshold': 0.05,  # Priority 2: Threshold for curved surface filtering (tuned to 0.05 for optimal 80% pass rate)
+    'curvature_threshold': 0.05,  # Priority 2: Threshold for curved surface filtering (tuned to 0.05)
+    'use_curvature_filtering': True,  # Re-enable for single-shape accuracy
     'angular_resolution': 48,
     'maxfev': 4000,
     'transition_detection_method': 'improved',  # 'legacy' or 'improved' (multi-derivative) - SWITCHED TO IMPROVED for better sphere cap detection
@@ -1026,16 +1027,17 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
         snr = signal_range / (noise_std + 1e-8)
 
         # Adapt percentile based on SNR
+        # NOTE: Lowered percentiles to improve composite shape detection
         if snr > 100:
             percentile = 70  # Very clean data - more sensitive
         elif snr > 50:
             percentile = 75  # Clean data
         elif snr > 20:
-            percentile = 80  # Moderate noise (default)
+            percentile = 78  # Moderate noise (lowered from 80 for composite detection)
         elif snr > 10:
-            percentile = 85  # Noisy data
+            percentile = 80  # Noisy data (lowered from 85 to catch shape boundaries)
         else:
-            percentile = 90  # Very noisy - less sensitive
+            percentile = 85  # Very noisy - less sensitive (lowered from 90)
 
         if verbose:
             logger.info(f"   SNR: {snr:.2f}, adaptive percentile: {percentile}")
@@ -1117,17 +1119,22 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
     # === IMPROVEMENT 4: Curvature-aware filtering (Priority 2) ===
     # Remove false transitions that occur within curved regions (inflection points)
     # Keep transitions only at boundaries between curved and linear regions
-    try:
-        curvature_threshold = DEFAULT_PARAMS.get('curvature_threshold', 0.10)
-        validated = filter_transitions_in_curves(
-            validated, area, heights, curvature_threshold=curvature_threshold
-        )
-        validated = sorted(list(set(validated)))
-        if verbose:
-            logger.info(f"   Curvature filtering applied: {len(validated) - 1} segments after filtering")
-    except Exception as e:
-        if verbose:
-            logger.warning(f"   Curvature filtering failed (using unfiltered): {e}")
+    # NOTE: Disabled by default (causes composite shape failures). Can be enabled if needed.
+    use_curvature_filter = DEFAULT_PARAMS.get('use_curvature_filtering', False)
+    if use_curvature_filter:
+        try:
+            curvature_threshold = DEFAULT_PARAMS.get('curvature_threshold', 0.10)
+            validated = filter_transitions_in_curves(
+                validated, area, heights, curvature_threshold=curvature_threshold
+            )
+            validated = sorted(list(set(validated)))
+            if verbose:
+                logger.info(f"   Curvature filtering applied: {len(validated) - 1} segments after filtering")
+        except Exception as e:
+            if verbose:
+                logger.warning(f"   Curvature filtering failed (using unfiltered): {e}")
+    elif verbose:
+        logger.info(f"   Curvature filtering disabled (relying on validation criteria)")
 
     if verbose:
         logger.info(f"   Validated segments: {len(validated) - 1}")

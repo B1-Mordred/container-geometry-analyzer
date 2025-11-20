@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-11-19T22:56:30.812870",
+  "timestamp": "2025-11-20T07:01:13.837151",
   "configuration": {
     "area_method": "local_regression",
     "transition_detection": "improved",
@@ -11,8 +11,8 @@
     "with_warnings": 1,
     "failed": 3,
     "pass_rate": 80.0,
-    "total_duration_ms": 312.61515617370605,
-    "avg_duration_ms": 20.841010411580402,
+    "total_duration_ms": 342.113733291626,
+    "avg_duration_ms": 22.80758221944173,
     "avg_fit_error_pct": 1.32783400917009,
     "max_fit_error_pct": 6.347090011485962,
     "shape_counts": {
@@ -26,7 +26,7 @@
     {
       "test_name": "composite_centrifuge_cone_cylinder",
       "passed": false,
-      "duration_ms": 31.537771224975586,
+      "duration_ms": 32.09948539733887,
       "segments_detected": 1,
       "shapes_detected": [
         "frustum"
@@ -45,7 +45,7 @@
     {
       "test_name": "composite_eppendorf_complex",
       "passed": false,
-      "duration_ms": 21.24166488647461,
+      "duration_ms": 21.543264389038086,
       "segments_detected": 1,
       "shapes_detected": [
         "frustum"
@@ -64,7 +64,7 @@
     {
       "test_name": "composite_flask_sphere_cylinder",
       "passed": false,
-      "duration_ms": 23.661375045776367,
+      "duration_ms": 23.35333824157715,
       "segments_detected": 1,
       "shapes_detected": [
         "cylinder"
@@ -83,7 +83,7 @@
     {
       "test_name": "cone_centrifuge_tip",
       "passed": true,
-      "duration_ms": 24.81365203857422,
+      "duration_ms": 18.22972297668457,
       "segments_detected": 1,
       "shapes_detected": [
         "cone"
@@ -100,7 +100,7 @@
     {
       "test_name": "cone_pipette_tip",
       "passed": true,
-      "duration_ms": 21.16680145263672,
+      "duration_ms": 22.228240966796875,
       "segments_detected": 1,
       "shapes_detected": [
         "cone"
@@ -117,7 +117,7 @@
     {
       "test_name": "cylinder_fine_sampling",
       "passed": true,
-      "duration_ms": 26.073694229125977,
+      "duration_ms": 25.96139907836914,
       "segments_detected": 1,
       "shapes_detected": [
         "cylinder"
@@ -134,7 +134,7 @@
     {
       "test_name": "cylinder_high_noise",
       "passed": true,
-      "duration_ms": 16.24584197998047,
+      "duration_ms": 20.189762115478516,
       "segments_detected": 1,
       "shapes_detected": [
         "frustum"
@@ -153,7 +153,7 @@
     {
       "test_name": "cylinder_large_60mm",
       "passed": true,
-      "duration_ms": 17.076492309570312,
+      "duration_ms": 21.710872650146484,
       "segments_detected": 1,
       "shapes_detected": [
         "cylinder"
@@ -170,7 +170,7 @@
     {
       "test_name": "cylinder_medium_17mm",
       "passed": true,
-      "duration_ms": 19.718647003173828,
+      "duration_ms": 19.75536346435547,
       "segments_detected": 1,
       "shapes_detected": [
         "cylinder"
@@ -187,7 +187,7 @@
     {
       "test_name": "cylinder_small_5mm",
       "passed": true,
-      "duration_ms": 20.195722579956055,
+      "duration_ms": 21.294355392456055,
       "segments_detected": 1,
       "shapes_detected": [
         "cylinder"
@@ -204,7 +204,7 @@
     {
       "test_name": "cylinder_sparse_sampling",
       "passed": true,
-      "duration_ms": 15.793800354003906,
+      "duration_ms": 19.150733947753906,
       "segments_detected": 1,
       "shapes_detected": [
         "cylinder"
@@ -221,7 +221,7 @@
     {
       "test_name": "frustum_expanding_beaker",
       "passed": true,
-      "duration_ms": 17.18735694885254,
+      "duration_ms": 22.015094757080078,
       "segments_detected": 1,
       "shapes_detected": [
         "frustum"
@@ -238,7 +238,7 @@
     {
       "test_name": "frustum_narrow_to_wide",
       "passed": true,
-      "duration_ms": 17.55356788635254,
+      "duration_ms": 23.3457088470459,
       "segments_detected": 1,
       "shapes_detected": [
         "frustum"
@@ -255,7 +255,7 @@
     {
       "test_name": "sphere_cap_flask_bottom",
       "passed": true,
-      "duration_ms": 18.8138484954834,
+      "duration_ms": 27.960777282714844,
       "segments_detected": 1,
       "shapes_detected": [
         "sphere_cap"
@@ -272,7 +272,7 @@
     {
       "test_name": "sphere_cap_vial_bottom",
       "passed": true,
-      "duration_ms": 21.53491973876953,
+      "duration_ms": 23.27561378479004,
       "segments_detected": 1,
       "shapes_detected": [
         "sphere_cap"
