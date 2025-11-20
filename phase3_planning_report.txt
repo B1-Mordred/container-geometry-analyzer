@@ -1,0 +1,334 @@
+================================================================================
+                   PHASE 2 TEST RESULTS ANALYSIS
+                      Phase 3 Planning Report
+================================================================================
+
+EXECUTIVE SUMMARY
+─────────────────────────────────────────────────────────────────────────────
+
+Overall Performance:
+  • Total Tests: 56
+  • Passed: 39 (69.6%)
+  • Failed: 17 (30.4%)
+  • Net Improvement from Baseline: +5 tests
+  • Regressions: 2 tests (caused by overly aggressive selective detection)
+  • Improvements: 7 tests
+
+Key Finding: Phase 2 improved composite shape detection (especially 10-15mm sizes)
+but created instability in edge cases. The main issues are:
+  • Under-detection: 14 failures (82% of all failures)
+  • Over-detection: 3 failures (18% of all failures)
+
+
+1. FAILURE BREAKDOWN BY SEGMENT TYPE
+─────────────────────────────────────────────────────────────────────────────
+
+1-SEGMENT TESTS (Simplest Category)
+  Success Rate: 12/24 = 87.5% ✓ (Strong baseline)
+  Failures: 3 tests (12.5%)
+  
+  Details:
+    • cone_5mm_2pct_error → Over-detected as 2 segments
+    • cone_10mm_2pct_error → Over-detected as 2 segments  
+    • sphere_cap_10mm_2pct_error → Over-detected as 3 segments
+  
+  Pattern: Only 2% error tests fail. 0% error = 100% pass rate.
+           Cone and sphere_cap are overly segmented with noise.
+
+2-SEGMENT TESTS (Composite Pairs)
+  Success Rate: 16/24 = 66.7% ⚠ (Moderate)
+  Failures: 8 tests (33.3%)
+  
+  Breakdown by Shape Pair:
+    • cone-cylinder: 1/3 fail (66.7%) - regressed in 15mm 2%
+    • sphere_cap-cylinder: 4/4 fail (0% pass) - CRITICAL
+    • frustum-cylinder: 3/4 fail (25% pass) - mostly 10mm+ ideal tests
+    • cone-frustum: 0/4 fail (100% pass) ✓ - BEST PERFORMER
+  
+  Pattern: sphere_cap involvement = 100% failure (4/4)
+           frustum-cylinder struggles with detection (under-detected)
+           cone-frustum works well - selective detection helps this pair
+
+3-SEGMENT TESTS (Most Complex)
+  Success Rate: 2/8 = 25.0% ✗ (Worst)
+  Failures: 6 tests (75.0%)
+  
+  Details:
+    • cone-cylinder-frustum: 2/4 fail
+    • sphere_cap-cylinder-cone: 4/4 fail (0% pass) - CRITICAL
+  
+  Pattern: All 3-segment failures = under-detection (missing 1 segment)
+           sphere_cap in 3-segment = always fails
+
+
+2. FAILURE BREAKDOWN BY CONTAINER SIZE
+─────────────────────────────────────────────────────────────────────────────
+
+5MM (Smallest - 32 tests)
+  Success Rate: 25/32 = 78.1% ✓
+  Failures: 7 tests (21.9%)
+  
+  By Segment Type:
+    • 1-segment: 1 failure (12.5%)
+    • 2-segment: 4 failures (50% of 2-seg tests)
+    • 3-segment: 0 failures (no 3-seg tests at 5mm)
+  
+  Pattern: Mostly composite failures, mostly sphere_cap pairs
+
+8MM (Medium - 4 tests - 3-segment only)
+  Success Rate: 1/4 = 25.0% ✗
+  Failures: 3 tests (75.0%)
+  
+  Pattern: All 3-segment tests at 8mm fail
+
+10MM (Medium - 20 tests)
+  Success Rate: 13/20 = 65.0% ⚠
+  Failures: 7 tests (35.0%) - HIGHEST concentration
+  
+  By Segment Type:
+    • 1-segment: 2 failures (25%)
+    • 2-segment: 2 failures (33.3%)
+    • 3-segment: 3 failures (75%)
+  
+  Pattern: Most problematic size for 3-segment tests
+           Still issues with sphere_cap composites
+
+15MM (Largest - 20 tests)
+  Success Rate: 15/20 = 75.0% ✓
+  Failures: 5 tests (25.0%)
+  
+  By Segment Type:
+    • 1-segment: 0 failures (100% pass) ✓ EXCELLENT
+    • 2-segment: 5 failures (62.5%)
+    • 3-segment: 0 failures (no 3-seg tests)
+  
+  Pattern: Large sizes are better for single shapes
+           Still struggling with 2-segment composites (sphere_cap, frustum-cyl)
+
+
+3. FAILURE BREAKDOWN BY ERROR LEVEL
+─────────────────────────────────────────────────────────────────────────────
+
+IDEAL (0% Error): 28 tests
+  Success Rate: 21/28 = 75.0% ✓
+  Failures: 7 tests (25.0%)
+  
+  Failure Types:
+    • 4 sphere_cap-cylinder issues (all sizes)
+    • 2 frustum-cylinder issues (10mm, 15mm ideal)
+    • 1 cone-cylinder issue (15mm)
+  
+  Pattern: Specific shape pair combinations fail regardless of data quality
+
+NOISY (2% Error): 28 tests
+  Success Rate: 18/28 = 64.3% ⚠
+  Failures: 10 tests (35.7%)
+  
+  Failure Types:
+    • 2 single cones (5mm, 10mm)
+    • 1 single sphere_cap (10mm)
+    • 1 cone-cylinder composite (15mm)
+    • 3 sphere_cap-cylinder composites
+    • 2 frustum-cylinder composites
+    • 3 multi-segment composites
+
+  Pattern: Noise exacerbates existing detection issues
+           More unpredictable but follows similar shape patterns
+
+
+4. KEY FAILURE PATTERNS & ROOT CAUSES
+─────────────────────────────────────────────────────────────────────────────
+
+PATTERN 1: sphere_cap-cylinder is Fundamentally Broken
+  • All 4 tests fail (0% pass rate)
+  • Affects: 5mm ideal, 10mm 2%, 15mm ideal, 15mm 2%
+  • Issue: Under-detection (merging 2 segments into 1)
+  • Root Cause: sphere_cap ≈ cylinder radius curve confuses merger logic
+
+PATTERN 2: 3-Segment Detection is Fundamentally Weak
+  • 75% failure rate (6/8 tests)
+  • sphere_cap-cylinder-cone: 100% failure
+  • Issue: Can't hold all 3 boundaries, collapses to 2
+  • Root Cause: Boundary detection threshold loses precision with >2 segments
+
+PATTERN 3: Composite Shapes >> Single Shapes in Difficulty
+  • Single shapes: 87.5% pass (12/24)
+  • Composites: 56.3% pass (18/32)
+  • Regression: Phase 2 broke some previously working composites
+  • Root Cause: Selective detection designed for simple cases, not composites
+
+PATTERN 4: Size-Dependent Issues
+  • 5mm: Better performance (78% pass) - smaller objects may be easier
+  • 10mm: Worst performance (65% pass) - "Goldilocks problem"
+  • 15mm: Good for singles, poor for composites
+  • Root Cause: Boundary detection resolution shifts with size changes
+
+PATTERN 5: Noise Sensitivity
+  • 0% error: 75% pass
+  • 2% error: 64% pass
+  • Impact: ~11% accuracy drop with just 2% measurement noise
+  • Root Cause: Selective confidence thresholds too sensitive
+
+
+5. OPPORTUNITIES FOR PHASE 3 OPTIMIZATION
+─────────────────────────────────────────────────────────────────────────────
+
+HIGHEST IMPACT OPPORTUNITIES:
+═══════════════════════════════════════════════════════════════════════════════
+
+Priority 1: Fix sphere_cap Detection (4 tests, 100% failure)
+  Current: All sphere_cap-cylinder tests fail
+  Impact: +4 test passes (7% accuracy improvement)
+  Effort: Medium - requires refining sphere_cap vs cylinder distinction
+  Approach:
+    ✓ Analyze false merges of sphere_cap-cylinder boundaries
+    ✓ Refine curvature thresholds for sphere_cap detection
+    ✓ Separate sphere_cap from frustum better in composites
+
+Priority 2: Improve 3-Segment Boundary Preservation (6 tests, 75% failure)
+  Current: Can only detect 2 of 3 segments
+  Impact: +4-5 test passes (7-9% improvement)
+  Effort: High - architectural change needed
+  Approach:
+    ✓ Implement multi-pass boundary detection
+    ✓ Reduce over-merging of close boundaries
+    ✓ Focus on sphere_cap-cylinder-cone (4 tests, currently 0% pass)
+
+Priority 3: Fix 10mm Size Category Issues (7 tests failing)
+  Current: 35% failure at 10mm vs 25% at 15mm
+  Impact: +2-3 test passes (3-5% improvement)
+  Effort: Medium - parameter tuning per size
+  Approach:
+    ✓ Adjust boundary distance thresholds for 10mm
+    ✓ Special handling for 10mm composites
+    ✓ Create size-specific confidence parameters
+
+Priority 4: Reduce Noise Sensitivity (affects ~3 tests with 2% error)
+  Current: 11% accuracy drop with measurement noise
+  Impact: +1-2 test passes (1-3% improvement)
+  Effort: Medium - smoothing/filtering improvements
+  Approach:
+    ✓ Add Gaussian smoothing before boundary detection
+    ✓ Increase confidence thresholds for noisy data
+    ✓ Implement adaptive thresholds based on noise level
+
+Priority 5: Address Over-Detection in Single Cones (2 tests)
+  Current: Cones with 2% error split into 2 segments
+  Impact: +2 test passes (3.5% improvement)
+  Effort: Low - simple threshold adjustment
+  Approach:
+    ✓ Refine cone curvature consistency checks
+    ✓ Reduce sensitivity to radius variations in noisy cones
+
+
+6. REALISTIC IMPROVEMENT ESTIMATES FOR PHASE 3
+─────────────────────────────────────────────────────────────────────────────
+
+Conservative Estimate (Safe Improvements):
+  • Fix sphere_cap-cylinder: +4 tests
+  • Improve 3-segment detection: +3 tests
+  • Fix single cone issues: +2 tests
+  ────────────────────────────
+  Potential Gains: +9 tests → 48/56 = 85.7%
+  
+  Realistic: Focus on achievable low-hanging fruit
+  Most likely: +6-7 tests → 45-46/56 = 80-82%
+
+Optimistic Estimate (Requires Architectural Changes):
+  • Fix sphere_cap-cylinder: +4 tests
+  • Fully solve 3-segment: +5 tests
+  • Optimize for all sizes: +2-3 tests
+  ────────────────────────────
+  Potential Gains: +11 tests → 50/56 = 89.3%
+  
+  Requires: Major refactoring of boundary detection
+  Risk: Could introduce new regressions
+
+RECOMMENDED TARGETS FOR PHASE 3:
+─────────────────────────────────────────────────────────────────────────────
+
+SHORT-TERM (Quick Wins):
+  1. sphere_cap-cylinder merging logic
+  2. Single cone over-detection fix
+  3. 10mm boundary distance tuning
+  Realistic Target: 44-45 passes (78-80%)
+
+MEDIUM-TERM (Moderate Effort):
+  1. sphere_cap-cylinder fix
+  2. 3-segment boundary preservation
+  3. Multi-size parameter optimization
+  Realistic Target: 46-48 passes (82-85%)
+
+LONG-TERM (If Pursuing 90%+):
+  1. Architectural redesign of multi-segment detection
+  2. Machine learning-based boundary classification
+  3. Adaptive parameter tuning per test characteristics
+  Realistic Target: 50+ passes (89%+)
+
+
+7. PHASE 3 FOCUS RECOMMENDATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+RECOMMENDED FOCUS ORDER:
+
+Stage 1 (Week 1):
+  Target: sphere_cap-cylinder failures (4 tests)
+  Action: Improve curvature-based shape distinction
+  Why: 100% failure rate + clear root cause
+  Effort: 2-3 days
+  
+Stage 2 (Week 1-2):
+  Target: Single cone noise sensitivity (2 tests)
+  Action: Refine cone detection for 2% error cases
+  Why: Low-hanging fruit, isolated issue
+  Effort: 1-2 days
+  
+Stage 3 (Week 2):
+  Target: 3-segment boundary preservation (6 tests)
+  Action: Implement multi-pass boundary detection or reduce merge threshold
+  Why: Highest impact remaining, but complex
+  Effort: 4-5 days
+  
+Stage 4 (Week 3+):
+  Target: Size-specific optimization (especially 10mm)
+  Action: Create per-size parameter profiles
+  Why: Improves overall robustness
+  Effort: 3-4 days
+
+
+8. TESTS NOT WORTH FIXING IN PHASE 3
+─────────────────────────────────────────────────────────────────────────────
+
+These tests regressed in Phase 2 and may not be worth fixing without understanding
+the root architectural issue:
+
+  ✗ composite_cone-cylinder_15mm_2pct_error (regressed)
+  ✗ composite_sphere_cap-cylinder_5mm_ideal (regressed)
+  
+Investigation needed: Why did these pass in Phase 1 but fail in Phase 2?
+This might reveal important insights about selective detection trade-offs.
+
+
+SUMMARY TABLE
+─────────────────────────────────────────────────────────────────────────────
+
+Category                    Count   Rate    Priority  Effort   Impact
+────────────────────────────────────────────────────────────────────────
+1-segment fails              3      12.5%   Low       Low      +3
+  └─ cone over-detect        2      9%      Medium    Low      +2 ✓
+  └─ sphere_cap over-detect  1      3%      Low       Medium   +1
+
+2-segment fails              8      33.3%   High      High     +4-5
+  └─ sphere_cap-cylinder     4      100%    Critical  Medium   +4 ✓✓
+  └─ frustum-cylinder        3      75%     High      High     +1
+  └─ cone-cylinder           1      33%     Medium    Low      +1 (regress)
+
+3-segment fails              6      75.0%   High      V.High  +4-5
+  └─ sphere_cap-cyl-cone     4      100%    Critical  V.High  +3 ✓✓
+  └─ cone-cyl-frustum        2      50%     High      High     +1-2
+
+Total Addressable: 17 failures
+Realistic Phase 3 Gain: 6-8 tests (35-47% of failures)
+Target Accuracy: 80-85% (45-48 tests passing)
+
+================================================================================

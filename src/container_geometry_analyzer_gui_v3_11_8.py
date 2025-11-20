@@ -95,9 +95,12 @@ DEFAULT_PARAMS = {
     'use_local_regression': True,  # Local polynomial regression for area computation
     'debug_transitions': False,  # Set to True to see detailed transition detection output
     # Priority 4: Selective Hybrid Routing (Phase 2 - Conservative Integration)
-    'use_selective_detection': False,  # Toggle for Phase 2 - Feature flag for instant rollback
+    'use_selective_detection': True,  # Toggle for Phase 2 - Feature flag for instant rollback (PHASE 2 DEPLOYED: +8.9% accuracy improvement)
     'selective_confidence_threshold': 'medium',  # 'high' or 'medium' - Confidence level required to use stability method (medium: +8.9% accuracy over baseline)
     'min_3segment_confidence': 'medium',  # Minimum confidence for 3-segment routing to stability method
+    # Phase 3: Cone noise filtering
+    'use_cone_smoothing': True,  # Enable Gaussian smoothing for cone profiles to reduce noise sensitivity
+    'cone_smoothing_sigma': 1.0,  # Gaussian smoothing sigma for cone noise filtering
 }
 
 # Priority 1: Size-Adaptive Parameters for Improved Detection Accuracy
@@ -384,6 +387,170 @@ def detect_sphere_cap_signature(area: np.ndarray, heights: np.ndarray = None) ->
             return False
 
     return True
+
+
+def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = None,
+                                     verbose: bool = False) -> Dict[str, float]:
+    """
+    Classify shape based on radius change pattern using Gaussian analysis.
+
+    Distinguishes sphere_cap (curved radius change) from cylinder (constant radius).
+
+    Handles real-world containers with measured vs. smooth radius profiles to
+    distinguish actual geometric curvature from measurement noise.
+
+    Args:
+        area: Cross-sectional areas
+        heights: Height values
+        verbose: Enable debug logging
+
+    Returns:
+        Dict with 'sphere_cap_confidence', 'cylinder_confidence', 'radius_curvature',
+        'fit_quality', 'profile_deviation'
+    """
+    if len(area) < 5:
+        return {
+            'sphere_cap_confidence': 0.0,
+            'cylinder_confidence': 0.0,
+            'radius_curvature': 0.0,
+            'fit_quality': 0.0,
+            'profile_deviation': 0.0
+        }
+
+    if heights is None:
+        heights = np.arange(len(area), dtype=float)
+
+    try:
+        # Convert area to radius
+        radius = np.sqrt(area / np.pi)
+
+        # === Phase 3: Improved profile smoothing for real containers ===
+        # Use Savitzky-Golay filter to preserve genuine curvature while removing noise
+        from scipy.ndimage import gaussian_filter1d
+        from scipy.signal import savgol_filter
+
+        # Create smoothed reference profile
+        if len(radius) >= 5:
+            try:
+                # Use Savitzky-Golay for better feature preservation
+                window_length = max(5, min(11, len(radius) // 3 if len(radius) % 2 == 0 else len(radius) // 3 + 1))
+                if window_length % 2 == 0:
+                    window_length -= 1  # Must be odd
+                radius_smooth_sg = savgol_filter(radius, window_length, 2)
+            except Exception:
+                # Fallback to Gaussian if Savitzky-Golay fails
+                radius_smooth_sg = gaussian_filter1d(radius, sigma=1.0)
+        else:
+            radius_smooth_sg = radius.copy()
+
+        # Quantify profile deviation (measured vs smooth)
+        # High deviation = noisy data; Low deviation = clean curvature
+        profile_deviation = np.std(radius - radius_smooth_sg) / (np.mean(radius) + 1e-8)
+        profile_deviation = min(1.0, max(0.0, profile_deviation))  # Normalize to [0, 1]
+
+        # Compute derivatives on smoothed profile for better curvature estimates
+        dR_dh = np.gradient(radius_smooth_sg, heights)
+        dR_dh_smooth = gaussian_filter1d(dR_dh, sigma=1.0)
+        d2R_dh2 = np.gradient(dR_dh_smooth, heights)
+
+        # Metrics for shape classification
+        # 1. Radius constancy (cylinder has near-zero variance in radius)
+        radius_std = np.std(radius_smooth_sg)  # Use smoothed for constancy metric
+        radius_mean = np.mean(radius_smooth_sg)
+        radius_cv = radius_std / (radius_mean + 1e-8) if radius_mean > 0 else 0.0
+
+        # 2. Curvature magnitude (sphere_cap has significant curvature)
+        curvature_mag = np.mean(np.abs(d2R_dh2))
+        curvature_max = np.max(np.abs(d2R_dh2))
+
+        # 3. Monotonicity check
+        diffs = np.diff(radius_smooth_sg)
+        is_monotonic = (np.all(diffs >= -1e-6) or np.all(diffs <= 1e-6))
+
+        # 4. Fit a Gaussian to dR/dh if profile looks like sphere_cap
+        gaussian_fit_quality = 0.0
+        if len(dR_dh_smooth) > 5:
+            try:
+                h_norm = (heights - heights[0]) / (heights[-1] - heights[0] + 1e-8)
+
+                def gaussian(h, amp, mu, sigma):
+                    return amp * np.exp(-(h - mu)**2 / (2*sigma**2))
+
+                popt, _ = curve_fit(
+                    gaussian,
+                    h_norm,
+                    np.abs(dR_dh_smooth),
+                    p0=[np.max(np.abs(dR_dh_smooth)), 0.5, 0.3],
+                    bounds=([0, 0, 0.01], [np.inf, 1, 0.5]),
+                    maxfev=1000
+                )
+
+                # Calculate R² (coefficient of determination)
+                y_pred = gaussian(h_norm, *popt)
+                ss_res = np.sum((np.abs(dR_dh_smooth) - y_pred)**2)
+                ss_tot = np.sum((np.abs(dR_dh_smooth) - np.mean(np.abs(dR_dh_smooth)))**2)
+                gaussian_fit_quality = 1.0 - (ss_res / (ss_tot + 1e-8))
+                gaussian_fit_quality = max(0.0, min(1.0, gaussian_fit_quality))
+            except Exception:
+                gaussian_fit_quality = 0.0
+
+        # Compute confidence scores
+        # Cylinder: low coefficient of variation, low curvature, fits constant model
+        cylinder_confidence = 0.0
+        if radius_cv < 0.02:  # Very constant radius
+            cylinder_confidence = min(1.0, (0.02 - radius_cv) / 0.02) * 0.5
+        if curvature_mag < 0.01:  # Minimal curvature
+            cylinder_confidence += 0.5 * (1.0 - min(1.0, curvature_mag / 0.01))
+
+        # Apply penalty if profile has high deviation (noisy measurement)
+        if profile_deviation > 0.02:  # More than 2% deviation indicates noise
+            cylinder_confidence *= (1.0 - profile_deviation * 0.5)
+
+        # Sphere cap: moderate radius change, significant curvature, fits Gaussian model
+        sphere_cap_confidence = 0.0
+        if 0.01 < radius_cv < 0.3:  # Moderate radius variation
+            sphere_cap_confidence += 0.3 * min(1.0, radius_cv / 0.3)
+        if curvature_mag > 0.01:  # Has curvature
+            sphere_cap_confidence += 0.2 * min(1.0, curvature_mag / 0.05)
+        if is_monotonic:  # Monotonic increase/decrease
+            sphere_cap_confidence += 0.2
+        # Gaussian fit bonus
+        if gaussian_fit_quality > 0.5:
+            sphere_cap_confidence += 0.3 * gaussian_fit_quality
+
+        # Penalize sphere_cap if curvature is just noise
+        if profile_deviation > 0.05:  # High noise level
+            sphere_cap_confidence *= (1.0 - profile_deviation * 0.3)
+
+        # Normalize to [0, 1]
+        sphere_cap_confidence = min(1.0, sphere_cap_confidence)
+        cylinder_confidence = min(1.0, cylinder_confidence)
+
+        if verbose:
+            logger.debug(f"Shape classification: sphere_cap={sphere_cap_confidence:.3f}, "
+                        f"cylinder={cylinder_confidence:.3f}, radius_cv={radius_cv:.4f}, "
+                        f"curvature={curvature_mag:.4f}, gaussian_fit={gaussian_fit_quality:.3f}, "
+                        f"profile_deviation={profile_deviation:.4f}")
+
+        return {
+            'sphere_cap_confidence': sphere_cap_confidence,
+            'cylinder_confidence': cylinder_confidence,
+            'radius_curvature': curvature_mag,
+            'fit_quality': gaussian_fit_quality,
+            'profile_deviation': profile_deviation
+        }
+
+    except Exception as e:
+        if verbose:
+            logger.debug(f"Radius profile classification failed: {e}")
+        return {
+            'sphere_cap_confidence': 0.0,
+            'cylinder_confidence': 0.0,
+            'radius_curvature': 0.0,
+            'fit_quality': 0.0,
+            'profile_deviation': 0.0
+        }
+
 
 
 def filter_transitions_in_curves(transitions: List[int], area: np.ndarray,
@@ -1534,11 +1701,21 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
         # === 3. TRY CONE FIT ===
         # Cone: starts from r=0 at apex
         try:
+            # Phase 3: Apply Gaussian smoothing for cone profiles to reduce noise sensitivity
+            y_for_cone = y.copy()
+            if DEFAULT_PARAMS.get('use_cone_smoothing', True) and len(y) > 5:
+                try:
+                    from scipy.ndimage import gaussian_filter1d
+                    sigma = DEFAULT_PARAMS.get('cone_smoothing_sigma', 1.0)
+                    y_for_cone = gaussian_filter1d(y, sigma=sigma)
+                except Exception as e:
+                    logger.debug(f"Cone smoothing failed: {e}, using original data")
+
             # Guess: r_base from final area
             area_end = area[min(end, len(area)-1)]
             r_base_guess = float(np.sqrt(area_end / np.pi))
 
-            popt_cone, _ = curve_fit(volume_cone, x - x[0], y - y[0],
+            popt_cone, _ = curve_fit(volume_cone, x - x[0], y_for_cone - y_for_cone[0],
                                     p0=[r_base_guess, height_span],
                                     bounds=([0.1*r_base_guess, 0.5*height_span],
                                            [5*r_base_guess, 2*height_span]),
@@ -1546,7 +1723,7 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             cone_error = np.mean(np.abs(volume_cone(x - x[0], *popt_cone) + y[0] - y))
             cone_error_pct = (cone_error / (y[-1] + 1e-6)) * 100
             fit_results.append(('cone', popt_cone, cone_error_pct))
-            logger.debug(f"Segment {i}: Cone fit error = {cone_error_pct:.2f}%")
+            logger.debug(f"Segment {i}: Cone fit error = {cone_error_pct:.2f}% (smoothed)")
         except Exception as e:
             logger.debug(f"Cone fit failed for segment {i}: {e}")
 
@@ -1571,6 +1748,13 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
 
         # === SELECT BEST FIT ===
         if fit_results:
+            # Phase 3: Apply Gaussian-based shape classification for better sphere_cap vs cylinder distinction
+            # This helps avoid misclassifying sphere_cap as cylinder in composite geometries
+            shape_classification = classify_shape_by_radius_profile(
+                segment_area, segment_heights_normalized,
+                verbose=DEFAULT_PARAMS.get('debug_transitions', False)
+            )
+
             # Apply shape complexity penalties for preference of simpler models
             # This helps avoid over-fitting with flexible shapes (frustum, cone)
             adjusted_results = []
@@ -1591,6 +1775,20 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
                     adjusted_error += 0.5  # Small penalty for model complexity
                 elif shape_name == 'cone' and error_pct < 3.0:
                     adjusted_error += 0.2  # Smaller penalty for cone (less complex than frustum)
+
+                # Phase 3: Gaussian-based adjustment for sphere_cap vs cylinder
+                # If the radius profile has curvature, boost sphere_cap confidence
+                if shape_name == 'sphere_cap':
+                    sphere_cap_conf = shape_classification['sphere_cap_confidence']
+                    if sphere_cap_conf > 0.5:  # Strong sphere_cap signature
+                        # Apply small bonus (negative penalty = bonus)
+                        adjusted_error -= 0.3 * sphere_cap_conf
+                elif shape_name == 'cylinder':
+                    cylinder_conf = shape_classification['cylinder_confidence']
+                    radius_curv = shape_classification['radius_curvature']
+                    # If radius profile shows curvature, penalize cylinder
+                    if radius_curv > 0.01 and cylinder_conf < 0.5:
+                        adjusted_error += 0.5 * min(1.0, radius_curv / 0.05)
 
                 adjusted_results.append((shape_name, params, error_pct, adjusted_error))
 
