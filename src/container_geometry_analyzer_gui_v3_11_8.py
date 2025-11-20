@@ -94,6 +94,10 @@ DEFAULT_PARAMS = {
     'use_multiscale': False,  # More thorough but slower
     'use_local_regression': True,  # Local polynomial regression for area computation
     'debug_transitions': False,  # Set to True to see detailed transition detection output
+    # Priority 4: Selective Hybrid Routing (Phase 2 - Conservative Integration)
+    'use_selective_detection': False,  # Toggle for Phase 2 - Feature flag for instant rollback
+    'selective_confidence_threshold': 'high',  # 'high' or 'medium' - Confidence level required to use stability method
+    'min_3segment_confidence': 'high',  # Minimum confidence for 3-segment routing to stability method
 }
 
 # Priority 1: Size-Adaptive Parameters for Improved Detection Accuracy
@@ -1236,6 +1240,138 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
 
     return validated
 
+
+def find_optimal_transitions_selective(area, heights=None, min_points=12,
+                                      diameter_mm=None, use_adaptive=True,
+                                      confidence_threshold='high',
+                                      verbose=False):
+    """
+    Priority 4: Phase 2 - Selective Hybrid Transition Detection
+
+    Conservative integration of stability-based detection with intelligent routing.
+
+    ROUTING LOGIC:
+    - Predicts segment count (1, 2, or 3+) using ensemble heuristics
+    - High-confidence 3+ segment → Uses stability method (Priority 4)
+    - All other cases → Uses proven multi-derivative method (baseline)
+
+    This conservative approach minimizes risk:
+    - Targets improvement only where it's most needed (3-segment)
+    - Maintains proven baseline for single shapes and 2-segment
+    - Feature flag allows instant rollback if issues found
+
+    Parameters:
+    -----------
+    area : np.ndarray
+        Cross-sectional areas
+    heights : np.ndarray, optional
+        Height values (if None, uses indices)
+    min_points : int
+        Minimum points per segment (default: 12)
+    diameter_mm : float, optional
+        Container diameter in mm (for size-aware thresholds)
+    use_adaptive : bool
+        Use adaptive SNR-based thresholding (default: True)
+    confidence_threshold : str
+        Minimum confidence for routing to stability method: 'high' or 'medium'
+    verbose : bool
+        Print detailed routing and method selection information
+
+    Returns:
+    --------
+    Tuple[List[int], str] : (Transition indices, method used: 'stability' or 'multi-derivative')
+    """
+    n = len(area)
+
+    if heights is None:
+        heights = np.arange(n, dtype=float)
+
+    if n < 2 * min_points:
+        if verbose:
+            logger.warning(f"⚠️  Too few points for segmentation ({n} < {2*min_points})")
+        return [0, n - 1], 'insufficient_data'
+
+    try:
+        # STEP 1: Predict segment count using ensemble method
+        if not HAS_STABILITY_DETECTION:
+            if verbose:
+                logger.warning("⚠️  Stability detection not available, using multi-derivative")
+            transitions = find_optimal_transitions_improved(
+                area, heights=heights, min_points=min_points,
+                use_adaptive=use_adaptive, verbose=verbose, diameter_mm=diameter_mm
+            )
+            return transitions, 'multi-derivative-fallback'
+
+        predicted_segs, seg_details = predict_segment_count(area, heights, verbose=verbose)
+
+        if verbose:
+            logger.info(f"🎯 Segment prediction: {predicted_segs} segments "
+                       f"({seg_details['confidence']} confidence)")
+            logger.info(f"   Methods: zero_crossing={seg_details.get('method1', '?')}, "
+                       f"curvature={seg_details.get('method2', '?')}, "
+                       f"variance={seg_details.get('method3', '?')}")
+
+        # STEP 2: Selective routing based on segment count and confidence
+        should_use_stability = (
+            predicted_segs >= 3 and
+            seg_details['confidence'] == confidence_threshold
+        )
+
+        if should_use_stability:
+            if verbose:
+                logger.info("🔄 High-confidence 3+ segment detected: Using stability method")
+
+            # Use Priority 4 stability-based detection
+            try:
+                transitions = find_stability_transitions(
+                    area, heights, min_points=min_points, verbose=verbose
+                )
+
+                # Validate transitions to remove false positives
+                transitions = validate_all_transitions(
+                    area, heights, transitions, verbose=verbose
+                )
+
+                method_used = 'stability'
+
+                if verbose:
+                    logger.info(f"✨ Stability method complete: {len(transitions) - 1} segments found")
+
+            except Exception as e:
+                # Graceful fallback to multi-derivative if stability method fails
+                if verbose:
+                    logger.warning(f"⚠️  Stability method failed ({e}), falling back to multi-derivative")
+                transitions = find_optimal_transitions_improved(
+                    area, heights=heights, min_points=min_points,
+                    use_adaptive=use_adaptive, verbose=verbose, diameter_mm=diameter_mm
+                )
+                method_used = 'multi-derivative-fallback'
+
+        else:
+            if verbose:
+                reason = f"predicted {predicted_segs} segments" if predicted_segs < 3 else "low confidence"
+                logger.info(f"🔄 Using multi-derivative ({reason})")
+
+            # Use proven multi-derivative method (baseline)
+            transitions = find_optimal_transitions_improved(
+                area, heights=heights, min_points=min_points,
+                use_adaptive=use_adaptive, verbose=verbose, diameter_mm=diameter_mm
+            )
+            method_used = 'multi-derivative'
+
+        return transitions, method_used
+
+    except Exception as e:
+        # Fallback to multi-derivative on any unexpected error
+        if verbose:
+            logger.warning(f"⚠️  Selective detection error: {e}, using multi-derivative fallback")
+        transitions = find_optimal_transitions_improved(
+            area, heights=heights, min_points=min_points,
+            use_adaptive=use_adaptive, verbose=verbose, diameter_mm=diameter_mm
+        )
+        return transitions, 'multi-derivative-emergency-fallback'
+
+
 def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
     """Main segmentation and fitting pipeline."""
     step_start = time.time()
@@ -1265,8 +1401,25 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
         logger.debug(f"  Using adaptive parameters: percentile={adaptive_params['percentile']}, "
                     f"merge_threshold={adaptive_params['merge_threshold']}, min_points={adaptive_params['min_points']}")
 
-    # Use improved or legacy transition detection
-    if DEFAULT_PARAMS.get('transition_detection_method', 'legacy') == 'improved':
+    # === Priority 4: Phase 2 - Selective Hybrid Routing ===
+    # Use selective routing if enabled, otherwise use standard improved detection
+    use_selective = DEFAULT_PARAMS.get('use_selective_detection', False)
+
+    if use_selective and HAS_STABILITY_DETECTION:
+        # Phase 2: Use selective hybrid routing for conservative integration
+        transitions, method_used = find_optimal_transitions_selective(
+            area,
+            heights=heights,
+            min_points=adaptive_params['min_points'],
+            diameter_mm=estimated_diameter,
+            use_adaptive=DEFAULT_PARAMS.get('use_adaptive_threshold', True),
+            confidence_threshold=DEFAULT_PARAMS.get('selective_confidence_threshold', 'high'),
+            verbose=verbose
+        )
+        if verbose:
+            logger.info(f"🎯 Phase 2 selective routing: {method_used} method used")
+    elif DEFAULT_PARAMS.get('transition_detection_method', 'legacy') == 'improved':
+        # Phase 1-3: Use improved detection (baseline multi-derivative)
         transitions = find_optimal_transitions_improved(
             area,
             heights=heights,
@@ -1278,6 +1431,7 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
         if verbose:
             logger.info("✨ Using improved transition detection (multi-derivative + diameter-specific tuning)")
     else:
+        # Legacy detection
         transitions = find_optimal_transitions(
             area,
             min_points=adaptive_params['min_points'],  # Use size-adaptive min_points
