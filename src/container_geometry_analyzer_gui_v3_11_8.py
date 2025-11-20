@@ -118,9 +118,42 @@ GEOMETRIC_CONSTRAINTS = {
     'fit_bounds_upper': 3.0,
 }
 
-# Priority 1: Helper Functions for Size-Adaptive Parameters
+# Priority 3: Diameter-Specific Percentile Ranges (SNR-based adaptive thresholding)
+# Different container diameters need different sensitivity levels
+# Tuned based on comprehensive assessment results:
+# - 5mm: 87.5% accuracy (conservative, detect less to avoid inflection over-segmentation)
+# - 10mm: 45.0% accuracy (aggressive, lower thresholds for composite shape detection)
+# - 15mm: 56.2% accuracy (balanced, focus on composite shape transitions)
+DIAMETER_SPECIFIC_PERCENTILES = {
+    'small': {      # d < 8mm - Very small containers
+        'very_clean': 65,       # SNR > 100 - More aggressive transition detection
+        'clean': 70,            # SNR > 50
+        'moderate': 75,         # SNR > 20
+        'noisy': 78,            # SNR > 10
+        'very_noisy': 80,       # SNR ≤ 10
+        'curvature_threshold': 0.04,  # Lower for aggressive inflection filtering
+    },
+    'medium': {     # 8mm ≤ d < 12mm - Medium-small containers (tuned for 10mm performance)
+        'very_clean': 68,       # SNR > 100 - More sensitive
+        'clean': 72,            # SNR > 50
+        'moderate': 76,         # SNR > 20
+        'noisy': 80,            # SNR > 10
+        'very_noisy': 83,       # SNR ≤ 10
+        'curvature_threshold': 0.06,  # Higher for more transitions
+    },
+    'large': {      # d ≥ 12mm - Medium and large containers (tuned for 15mm performance)
+        'very_clean': 70,       # SNR > 100
+        'clean': 75,            # SNR > 50
+        'moderate': 78,         # SNR > 20
+        'noisy': 82,            # SNR > 10
+        'very_noisy': 85,       # SNR ≤ 10
+        'curvature_threshold': 0.05,  # Standard for balanced detection
+    }
+}
+
+# Priority 1 & 3: Helper Functions for Size-Adaptive Parameters
 def get_size_category(diameter_mm: float) -> str:
-    """Determine size category based on container diameter.
+    """Determine size category based on container diameter for SIZE_ADAPTIVE_PARAMS.
 
     Args:
         diameter_mm: Container diameter in millimeters
@@ -131,6 +164,23 @@ def get_size_category(diameter_mm: float) -> str:
     if diameter_mm < 12.0:
         return 'small'
     elif diameter_mm < 14.0:
+        return 'medium'
+    else:
+        return 'large'
+
+
+def get_diameter_category(diameter_mm: float) -> str:
+    """Determine diameter category for DIAMETER_SPECIFIC_PERCENTILES (Priority 3).
+
+    Args:
+        diameter_mm: Container diameter in millimeters
+
+    Returns:
+        'small' (d < 8mm), 'medium' (8 ≤ d < 12mm), or 'large' (d ≥ 12mm)
+    """
+    if diameter_mm < 8.0:
+        return 'small'
+    elif diameter_mm < 12.0:
         return 'medium'
     else:
         return 'large'
@@ -947,14 +997,15 @@ def find_optimal_transitions(area, min_points=12, percentile=80, variance_thresh
     return validated
 
 def find_optimal_transitions_improved(area, heights=None, min_points=12,
-                                      use_adaptive=True, verbose=False):
+                                      use_adaptive=True, verbose=False, diameter_mm=None):
     """
     Improved transition detection using multi-derivative analysis.
 
     Key improvements over legacy method:
     1. Uses second derivative (curvature) to detect slope changes
     2. Adaptive threshold based on signal-to-noise ratio
-    3. Better validation using multiple criteria
+    3. Diameter-specific percentile tuning (Priority 3)
+    4. Better validation using multiple criteria
 
     Parameters:
     -----------
@@ -968,6 +1019,8 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
         Use adaptive thresholding based on SNR
     verbose : bool
         Print detailed information
+    diameter_mm : float, optional
+        Container diameter in mm (used for diameter-specific percentile tuning)
 
     Returns:
     --------
@@ -1015,7 +1068,7 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
     score = (0.6 * normalize_score(first_deriv_change) +
              0.4 * normalize_score(second_deriv_abs))
 
-    # === IMPROVEMENT 2: Adaptive threshold ===
+    # === IMPROVEMENT 2: Adaptive threshold with Diameter-Specific Tuning (Priority 3) ===
     if use_adaptive:
         # Estimate signal-to-noise ratio
         area_very_smooth = savgol_filter(area,
@@ -1026,18 +1079,37 @@ def find_optimal_transitions_improved(area, heights=None, min_points=12,
         signal_range = np.max(area) - np.min(area)
         snr = signal_range / (noise_std + 1e-8)
 
-        # Adapt percentile based on SNR
-        # NOTE: Lowered percentiles to improve composite shape detection
-        if snr > 100:
-            percentile = 70  # Very clean data - more sensitive
-        elif snr > 50:
-            percentile = 75  # Clean data
-        elif snr > 20:
-            percentile = 78  # Moderate noise (lowered from 80 for composite detection)
-        elif snr > 10:
-            percentile = 80  # Noisy data (lowered from 85 to catch shape boundaries)
+        # Priority 3: Use diameter-specific percentile ranges
+        if diameter_mm is not None:
+            dia_category = get_diameter_category(diameter_mm)
+            dia_percentiles = DIAMETER_SPECIFIC_PERCENTILES[dia_category]
+
+            # Select percentile based on SNR and diameter category
+            if snr > 100:
+                percentile = dia_percentiles['very_clean']
+            elif snr > 50:
+                percentile = dia_percentiles['clean']
+            elif snr > 20:
+                percentile = dia_percentiles['moderate']
+            elif snr > 10:
+                percentile = dia_percentiles['noisy']
+            else:
+                percentile = dia_percentiles['very_noisy']
+
+            if verbose:
+                logger.info(f"   Diameter-specific tuning: {dia_category} container (d={diameter_mm:.1f}mm)")
         else:
-            percentile = 85  # Very noisy - less sensitive (lowered from 90)
+            # Fallback to generic tuning if diameter not provided
+            if snr > 100:
+                percentile = 70  # Very clean data - more sensitive
+            elif snr > 50:
+                percentile = 75  # Clean data
+            elif snr > 20:
+                percentile = 78  # Moderate noise
+            elif snr > 10:
+                percentile = 80  # Noisy data
+            else:
+                percentile = 85  # Very noisy - less sensitive
 
         if verbose:
             logger.info(f"   SNR: {snr:.2f}, adaptive percentile: {percentile}")
@@ -1189,10 +1261,11 @@ def segment_and_fit_optimized(df_areas, job: AnalysisJob = None, verbose=True):
             heights=heights,
             min_points=adaptive_params['min_points'],  # Use size-adaptive min_points
             use_adaptive=DEFAULT_PARAMS.get('use_adaptive_threshold', True),
-            verbose=verbose
+            verbose=verbose,
+            diameter_mm=estimated_diameter  # Priority 3: Pass diameter for diameter-specific tuning
         )
         if verbose:
-            logger.info("✨ Using improved transition detection (multi-derivative + adaptive)")
+            logger.info("✨ Using improved transition detection (multi-derivative + diameter-specific tuning)")
     else:
         transitions = find_optimal_transitions(
             area,
