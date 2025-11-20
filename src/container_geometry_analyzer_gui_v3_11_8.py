@@ -396,20 +396,25 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
 
     Distinguishes sphere_cap (curved radius change) from cylinder (constant radius).
 
+    Handles real-world containers with measured vs. smooth radius profiles to
+    distinguish actual geometric curvature from measurement noise.
+
     Args:
         area: Cross-sectional areas
         heights: Height values
         verbose: Enable debug logging
 
     Returns:
-        Dict with 'sphere_cap_confidence', 'cylinder_confidence', 'radius_curvature'
+        Dict with 'sphere_cap_confidence', 'cylinder_confidence', 'radius_curvature',
+        'fit_quality', 'profile_deviation'
     """
     if len(area) < 5:
         return {
             'sphere_cap_confidence': 0.0,
             'cylinder_confidence': 0.0,
             'radius_curvature': 0.0,
-            'fit_quality': 0.0
+            'fit_quality': 0.0,
+            'profile_deviation': 0.0
         }
 
     if heights is None:
@@ -419,20 +424,39 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
         # Convert area to radius
         radius = np.sqrt(area / np.pi)
 
-        # Compute first derivative (dR/dh) - rate of radius change
-        dR_dh = np.gradient(radius, heights)
-
-        # Smooth the derivative to reduce noise
+        # === Phase 3: Improved profile smoothing for real containers ===
+        # Use Savitzky-Golay filter to preserve genuine curvature while removing noise
         from scipy.ndimage import gaussian_filter1d
-        dR_dh_smooth = gaussian_filter1d(dR_dh, sigma=1.0)
+        from scipy.signal import savgol_filter
 
-        # Compute second derivative (d²R/dh²) - curvature
+        # Create smoothed reference profile
+        if len(radius) >= 5:
+            try:
+                # Use Savitzky-Golay for better feature preservation
+                window_length = max(5, min(11, len(radius) // 3 if len(radius) % 2 == 0 else len(radius) // 3 + 1))
+                if window_length % 2 == 0:
+                    window_length -= 1  # Must be odd
+                radius_smooth_sg = savgol_filter(radius, window_length, 2)
+            except Exception:
+                # Fallback to Gaussian if Savitzky-Golay fails
+                radius_smooth_sg = gaussian_filter1d(radius, sigma=1.0)
+        else:
+            radius_smooth_sg = radius.copy()
+
+        # Quantify profile deviation (measured vs smooth)
+        # High deviation = noisy data; Low deviation = clean curvature
+        profile_deviation = np.std(radius - radius_smooth_sg) / (np.mean(radius) + 1e-8)
+        profile_deviation = min(1.0, max(0.0, profile_deviation))  # Normalize to [0, 1]
+
+        # Compute derivatives on smoothed profile for better curvature estimates
+        dR_dh = np.gradient(radius_smooth_sg, heights)
+        dR_dh_smooth = gaussian_filter1d(dR_dh, sigma=1.0)
         d2R_dh2 = np.gradient(dR_dh_smooth, heights)
 
         # Metrics for shape classification
         # 1. Radius constancy (cylinder has near-zero variance in radius)
-        radius_std = np.std(radius)
-        radius_mean = np.mean(radius)
+        radius_std = np.std(radius_smooth_sg)  # Use smoothed for constancy metric
+        radius_mean = np.mean(radius_smooth_sg)
         radius_cv = radius_std / (radius_mean + 1e-8) if radius_mean > 0 else 0.0
 
         # 2. Curvature magnitude (sphere_cap has significant curvature)
@@ -440,17 +464,15 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
         curvature_max = np.max(np.abs(d2R_dh2))
 
         # 3. Monotonicity check
-        diffs = np.diff(radius)
+        diffs = np.diff(radius_smooth_sg)
         is_monotonic = (np.all(diffs >= -1e-6) or np.all(diffs <= 1e-6))
 
         # 4. Fit a Gaussian to dR/dh if profile looks like sphere_cap
         gaussian_fit_quality = 0.0
         if len(dR_dh_smooth) > 5:
             try:
-                # Expected Gaussian parameters for sphere_cap dR/dh
                 h_norm = (heights - heights[0]) / (heights[-1] - heights[0] + 1e-8)
 
-                # Try Gaussian fit: area * exp(-(h - mu)^2 / (2*sigma^2))
                 def gaussian(h, amp, mu, sigma):
                     return amp * np.exp(-(h - mu)**2 / (2*sigma**2))
 
@@ -480,6 +502,10 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
         if curvature_mag < 0.01:  # Minimal curvature
             cylinder_confidence += 0.5 * (1.0 - min(1.0, curvature_mag / 0.01))
 
+        # Apply penalty if profile has high deviation (noisy measurement)
+        if profile_deviation > 0.02:  # More than 2% deviation indicates noise
+            cylinder_confidence *= (1.0 - profile_deviation * 0.5)
+
         # Sphere cap: moderate radius change, significant curvature, fits Gaussian model
         sphere_cap_confidence = 0.0
         if 0.01 < radius_cv < 0.3:  # Moderate radius variation
@@ -492,6 +518,10 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
         if gaussian_fit_quality > 0.5:
             sphere_cap_confidence += 0.3 * gaussian_fit_quality
 
+        # Penalize sphere_cap if curvature is just noise
+        if profile_deviation > 0.05:  # High noise level
+            sphere_cap_confidence *= (1.0 - profile_deviation * 0.3)
+
         # Normalize to [0, 1]
         sphere_cap_confidence = min(1.0, sphere_cap_confidence)
         cylinder_confidence = min(1.0, cylinder_confidence)
@@ -499,13 +529,15 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
         if verbose:
             logger.debug(f"Shape classification: sphere_cap={sphere_cap_confidence:.3f}, "
                         f"cylinder={cylinder_confidence:.3f}, radius_cv={radius_cv:.4f}, "
-                        f"curvature={curvature_mag:.4f}, gaussian_fit={gaussian_fit_quality:.3f}")
+                        f"curvature={curvature_mag:.4f}, gaussian_fit={gaussian_fit_quality:.3f}, "
+                        f"profile_deviation={profile_deviation:.4f}")
 
         return {
             'sphere_cap_confidence': sphere_cap_confidence,
             'cylinder_confidence': cylinder_confidence,
             'radius_curvature': curvature_mag,
-            'fit_quality': gaussian_fit_quality
+            'fit_quality': gaussian_fit_quality,
+            'profile_deviation': profile_deviation
         }
 
     except Exception as e:
@@ -515,8 +547,10 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
             'sphere_cap_confidence': 0.0,
             'cylinder_confidence': 0.0,
             'radius_curvature': 0.0,
-            'fit_quality': 0.0
+            'fit_quality': 0.0,
+            'profile_deviation': 0.0
         }
+
 
 
 def filter_transitions_in_curves(transitions: List[int], area: np.ndarray,
