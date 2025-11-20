@@ -96,8 +96,8 @@ DEFAULT_PARAMS = {
     'debug_transitions': False,  # Set to True to see detailed transition detection output
     # Priority 4: Selective Hybrid Routing (Phase 2 - Conservative Integration)
     'use_selective_detection': False,  # Toggle for Phase 2 - Feature flag for instant rollback
-    'selective_confidence_threshold': 'high',  # 'high' or 'medium' - Confidence level required to use stability method
-    'min_3segment_confidence': 'high',  # Minimum confidence for 3-segment routing to stability method
+    'selective_confidence_threshold': 'medium',  # 'high' or 'medium' - Confidence level required to use stability method (medium: +8.9% accuracy over baseline)
+    'min_3segment_confidence': 'medium',  # Minimum confidence for 3-segment routing to stability method
 }
 
 # Priority 1: Size-Adaptive Parameters for Improved Detection Accuracy
