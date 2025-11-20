@@ -1,0 +1,1795 @@
+{
+  "timestamp": "2025-11-20T09:42:28.719041",
+  "configuration": {
+    "baseline": "Phase 1-3 (use_selective_detection=False)",
+    "phase2": "Phase 2 (use_selective_detection=True, confidence=medium)"
+  },
+  "summary": {
+    "total_tests": 56,
+    "baseline_passed": 34,
+    "phase2_passed": 39,
+    "improved": 7,
+    "regressed": 2,
+    "baseline_accuracy": "60.7%",
+    "phase2_accuracy": "69.6%",
+    "net_change": "+5"
+  },
+  "results": [
+    {
+      "test_file": "test_data_comprehensive/cylinder_5mm_ideal.csv",
+      "description": "Single cylinder, 5mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.020613431930541992
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.016370058059692383
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cylinder_5mm_2pct_error.csv",
+      "description": "Single cylinder, 5mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02638840675354004
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.018727779388427734
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cylinder_10mm_ideal.csv",
+      "description": "Single cylinder, 10mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.017556190490722656
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.016623735427856445
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cylinder_10mm_2pct_error.csv",
+      "description": "Single cylinder, 10mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.029228687286376953
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02994227409362793
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cylinder_15mm_ideal.csv",
+      "description": "Single cylinder, 15mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.014593124389648438
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01843547821044922
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cylinder_15mm_2pct_error.csv",
+      "description": "Single cylinder, 15mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.016440391540527344
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.026983976364135742
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cone_5mm_ideal.csv",
+      "description": "Single cone, 5mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02134394645690918
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.021779537200927734
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cone_5mm_2pct_error.csv",
+      "description": "Single cone, 5mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.0375828742980957
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.02972888946533203
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cone_10mm_ideal.csv",
+      "description": "Single cone, 10mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02272796630859375
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02281641960144043
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cone_10mm_2pct_error.csv",
+      "description": "Single cone, 10mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.029240131378173828
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.03572392463684082
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cone_15mm_ideal.csv",
+      "description": "Single cone, 15mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.019951343536376953
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02169179916381836
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/cone_15mm_2pct_error.csv",
+      "description": "Single cone, 15mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01993083953857422
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02514791488647461
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/sphere_cap_5mm_ideal.csv",
+      "description": "Single sphere_cap, 5mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "sphere_cap"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01891469955444336
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.019817113876342773
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/sphere_cap_5mm_2pct_error.csv",
+      "description": "Single sphere_cap, 5mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "sphere_cap"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.024615764617919922
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.019576072692871094
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/sphere_cap_10mm_ideal.csv",
+      "description": "Single sphere_cap, 10mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "sphere_cap"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.07236480712890625
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01900768280029297
+      },
+      "improved": true,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/sphere_cap_10mm_2pct_error.csv",
+      "description": "Single sphere_cap, 10mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "sphere_cap"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 3,
+        "shapes_detected": [
+          "frustum",
+          "sphere_cap",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.037093400955200195
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 3,
+        "shapes_detected": [
+          "frustum",
+          "sphere_cap",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.03710794448852539
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/sphere_cap_15mm_ideal.csv",
+      "description": "Single sphere_cap, 15mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "sphere_cap"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01692819595336914
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.016818761825561523
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/sphere_cap_15mm_2pct_error.csv",
+      "description": "Single sphere_cap, 15mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "sphere_cap"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01631331443786621
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.017319440841674805
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/frustum_5mm_ideal.csv",
+      "description": "Single frustum, 5mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.021997451782226562
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01842641830444336
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/frustum_5mm_2pct_error.csv",
+      "description": "Single frustum, 5mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.016382932662963867
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.01856398582458496
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/frustum_10mm_ideal.csv",
+      "description": "Single frustum, 10mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.019047975540161133
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.019006013870239258
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/frustum_10mm_2pct_error.csv",
+      "description": "Single frustum, 10mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.0171048641204834
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.019161462783813477
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/frustum_15mm_ideal.csv",
+      "description": "Single frustum, 15mm, 50mm height, 0% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.016974687576293945
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.019456863403320312
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/frustum_15mm_2pct_error.csv",
+      "description": "Single frustum, 15mm, 50mm height, 2% error",
+      "expected_segments": 1,
+      "expected_shapes": [
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.017284631729125977
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.017203330993652344
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-cylinder_5mm_ideal.csv",
+      "description": "Composite cone-cylinder, 5mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.030837297439575195
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.026499032974243164
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-cylinder_5mm_2pct_error.csv",
+      "description": "Composite cone-cylinder, 5mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02699756622314453
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.03473305702209473
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-cylinder_10mm_ideal.csv",
+      "description": "Composite cone-cylinder, 10mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.015336275100708008
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.034059762954711914
+      },
+      "improved": true,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-cylinder_10mm_2pct_error.csv",
+      "description": "Composite cone-cylinder, 10mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.03749418258666992
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.03368830680847168
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-cylinder_15mm_ideal.csv",
+      "description": "Composite cone-cylinder, 15mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01684403419494629
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.0316767692565918
+      },
+      "improved": true,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-cylinder_15mm_2pct_error.csv",
+      "description": "Composite cone-cylinder, 15mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.025710344314575195
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cone"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01995253562927246
+      },
+      "improved": false,
+      "regressed": true
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_sphere_cap-cylinder_5mm_ideal.csv",
+      "description": "Composite sphere_cap-cylinder, 5mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.026650667190551758
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.021317481994628906
+      },
+      "improved": false,
+      "regressed": true
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_sphere_cap-cylinder_5mm_2pct_error.csv",
+      "description": "Composite sphere_cap-cylinder, 5mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02549266815185547
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02719569206237793
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_sphere_cap-cylinder_10mm_ideal.csv",
+      "description": "Composite sphere_cap-cylinder, 10mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cylinder",
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.023764848709106445
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cylinder",
+          "frustum"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.027112245559692383
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_sphere_cap-cylinder_10mm_2pct_error.csv",
+      "description": "Composite sphere_cap-cylinder, 10mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.019052982330322266
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.019661664962768555
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_sphere_cap-cylinder_15mm_ideal.csv",
+      "description": "Composite sphere_cap-cylinder, 15mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.018230199813842773
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.017615079879760742
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_sphere_cap-cylinder_15mm_2pct_error.csv",
+      "description": "Composite sphere_cap-cylinder, 15mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01780986785888672
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01932501792907715
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_frustum-cylinder_5mm_ideal.csv",
+      "description": "Composite frustum-cylinder, 5mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "frustum",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.026054859161376953
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.024075984954833984
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_frustum-cylinder_5mm_2pct_error.csv",
+      "description": "Composite frustum-cylinder, 5mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "frustum",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.028298139572143555
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.027910947799682617
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_frustum-cylinder_10mm_ideal.csv",
+      "description": "Composite frustum-cylinder, 10mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "frustum",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.016824722290039062
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01681661605834961
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_frustum-cylinder_10mm_2pct_error.csv",
+      "description": "Composite frustum-cylinder, 10mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "frustum",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.027559995651245117
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.03122735023498535
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_frustum-cylinder_15mm_ideal.csv",
+      "description": "Composite frustum-cylinder, 15mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "frustum",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.016660213470458984
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01926445960998535
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_frustum-cylinder_15mm_2pct_error.csv",
+      "description": "Composite frustum-cylinder, 15mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "frustum",
+        "cylinder"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01696014404296875
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.017384767532348633
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-frustum_5mm_ideal.csv",
+      "description": "Composite cone-frustum, 5mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.028568029403686523
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.025737762451171875
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-frustum_5mm_2pct_error.csv",
+      "description": "Composite cone-frustum, 5mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.026070117950439453
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.02668929100036621
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-frustum_10mm_ideal.csv",
+      "description": "Composite cone-frustum, 10mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.016634702682495117
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.027823209762573242
+      },
+      "improved": true,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-frustum_10mm_2pct_error.csv",
+      "description": "Composite cone-frustum, 10mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01810622215270996
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.023581266403198242
+      },
+      "improved": true,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-frustum_15mm_ideal.csv",
+      "description": "Composite cone-frustum, 15mm, 0% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.017199993133544922
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.026221275329589844
+      },
+      "improved": true,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite_cone-frustum_15mm_2pct_error.csv",
+      "description": "Composite cone-frustum, 15mm, 2% error",
+      "expected_segments": 2,
+      "expected_shapes": [
+        "cone",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "sphere_cap"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.01618051528930664
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.025964736938476562
+      },
+      "improved": true,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_cone-cylinder-frustum_8mm_ideal.csv",
+      "description": "Composite cone-cylinder-frustum, 8mm, 0% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "cone",
+        "cylinder",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 3,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.03587603569030762
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 3,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.03605151176452637
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_cone-cylinder-frustum_8mm_2pct_error.csv",
+      "description": "Composite cone-cylinder-frustum, 8mm, 2% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "cone",
+        "cylinder",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.02693629264831543
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.028594017028808594
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_cone-cylinder-frustum_10mm_ideal.csv",
+      "description": "Composite cone-cylinder-frustum, 10mm, 0% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "cone",
+        "cylinder",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.02785325050354004
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cone",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.029157638549804688
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_cone-cylinder-frustum_10mm_2pct_error.csv",
+      "description": "Composite cone-cylinder-frustum, 10mm, 2% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "cone",
+        "cylinder",
+        "frustum"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 3,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.040316104888916016
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 3,
+        "shapes_detected": [
+          "cone",
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": true,
+        "elapsed": 0.04403114318847656
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_sphere_cap-cylinder-cone_8mm_ideal.csv",
+      "description": "Composite sphere_cap-cylinder-cone, 8mm, 0% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder",
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.028540611267089844
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "sphere_cap",
+          "cone"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.02693939208984375
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_sphere_cap-cylinder-cone_8mm_2pct_error.csv",
+      "description": "Composite sphere_cap-cylinder-cone, 8mm, 2% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder",
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.028239011764526367
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.027726173400878906
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_sphere_cap-cylinder-cone_10mm_ideal.csv",
+      "description": "Composite sphere_cap-cylinder-cone, 10mm, 0% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder",
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "cylinder",
+          "frustum"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.02913522720336914
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 1,
+        "shapes_detected": [
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.017345428466796875
+      },
+      "improved": false,
+      "regressed": false
+    },
+    {
+      "test_file": "test_data_comprehensive/composite3_sphere_cap-cylinder-cone_10mm_2pct_error.csv",
+      "description": "Composite sphere_cap-cylinder-cone, 10mm, 2% error",
+      "expected_segments": 3,
+      "expected_shapes": [
+        "sphere_cap",
+        "cylinder",
+        "cone"
+      ],
+      "baseline": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.027241945266723633
+      },
+      "phase2_medium": {
+        "success": true,
+        "segments_detected": 2,
+        "shapes_detected": [
+          "frustum",
+          "cylinder"
+        ],
+        "error": null,
+        "passed": false,
+        "elapsed": 0.028539657592773438
+      },
+      "improved": false,
+      "regressed": false
+    }
+  ]
+}
