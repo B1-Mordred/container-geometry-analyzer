@@ -1,0 +1,273 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                   PHASE 2 ANALYSIS - EXECUTIVE SUMMARY                    ║
+║                     Phase 3 Optimization Roadmap                          ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+CURRENT STATE (Phase 2 Results)
+═════════════════════════════════════════════════════════════════════════════
+
+Performance:        39/56 tests passing (69.6%)
+Improvement:        +5 tests from Phase 1 baseline (60.7%)
+Regressions:        2 tests broken by Phase 2 changes
+Improvements:       7 tests fixed by selective detection
+
+Main Weakness:      Complex composite shapes (esp. 2-3 segments)
+Main Strength:      Single shapes and 5mm composites
+
+
+CRITICAL FINDINGS
+═════════════════════════════════════════════════════════════════════════════
+
+FAILURE DISTRIBUTION:
+
+By Segment Type:
+  • 1-segment tests:  12.5% failure (3/24)  ✓ Acceptable
+  • 2-segment tests:  33.3% failure (8/24)  ⚠ Problem area
+  • 3-segment tests:  75.0% failure (6/8)   ✗ Critical weakness
+
+By Size Category:
+  • 5mm:  21.9% failure  ✓ Best performer
+  • 8mm:  75.0% failure  ✗ Only 3-seg tests, all fail
+  • 10mm: 35.0% failure  ⚠ Most failures in absolute count
+  • 15mm: 25.0% failure  ✓ Good for single shapes
+
+By Error Level:
+  • 0% error (ideal):   25.0% failure  ✓
+  • 2% error (noisy):   35.7% failure  ⚠ Noise sensitivity issue
+
+
+ROOT CAUSES (Identified Problems)
+═════════════════════════════════════════════════════════════════════════════
+
+PROBLEM #1: sphere_cap-cylinder Merging (4 tests, 0% pass rate)
+  └─ Issue: Two different shapes merged into one segment
+  └─ Root: Curvature thresholds overlap between shapes
+  └─ Fix difficulty: MEDIUM (2-3 days)
+  └─ Impact: +4 tests → 76.8% total
+
+PROBLEM #2: 3-Segment Boundary Collapse (6 tests, 75% fail rate)
+  └─ Issue: Missing 1 segment in complex composites
+  └─ Root: Boundary detection loses precision with 3+ segments
+  └─ Fix difficulty: HIGH (4-5 days, architectural)
+  └─ Impact: +3-4 tests → 82-84% total
+
+PROBLEM #3: Noise-Induced Over-Segmentation (2 tests, single cones)
+  └─ Issue: Noise creates false boundaries in smooth cones
+  └─ Root: Confidence thresholds too low for noisy data
+  └─ Fix difficulty: LOW (1-2 days, smoothing)
+  └─ Impact: +2 tests → 80.4% total
+
+PROBLEM #4: frustum-cylinder Detection (3 tests, 75% fail rate)
+  └─ Issue: Frustum curve too similar to cylinder
+  └─ Root: Curvature-only detection insufficient
+  └─ Fix difficulty: MEDIUM (2-3 days)
+  └─ Impact: +1-2 tests → 75% total
+
+
+PHASE 3 IMPROVEMENT PLAN
+═════════════════════════════════════════════════════════════════════════════
+
+TIER 1: HIGH-CONFIDENCE QUICK WINS (Week 1)
+  ├─ Fix sphere_cap-cylinder merging         [2-3 days] → +4 tests
+  └─ Fix cone over-detection noise           [1-2 days] → +2 tests
+     SUBTOTAL:  45-46/56 = 80-82%
+
+TIER 2: MEDIUM EFFORT IMPROVEMENTS (Week 2)
+  ├─ Implement 3-segment boundary preservation [4-5 days] → +3-4 tests
+     SUBTOTAL:  48-49/56 = 85-87%
+
+TIER 3: SPECIALIZED FIXES (Week 3)
+  ├─ Improve frustum-cylinder detection      [2-3 days] → +1-2 tests
+  └─ Investigate regression                  [1-2 days] → +1 test
+     FINAL TARGET:  49-51/56 = 87-91%
+
+
+RECOMMENDED EXECUTION SEQUENCE
+═════════════════════════════════════════════════════════════════════════════
+
+PHASE 3A: "Safe Improvements" (1 week, 80% confidence)
+  Week 1:
+    Day 1-2: sphere_cap-cylinder fix (curvature classification)
+    Day 2-3: Cone noise smoothing (Gaussian filter)
+  
+  Expected: 45/56 = 80.4%
+  Risk: LOW (isolated changes, high success probability)
+  Worth doing: YES (7% improvement over Phase 2)
+
+PHASE 3B: "Moderate Risk Improvements" (1 week, 70% confidence)
+  Week 2:
+    Day 1:   Design multi-pass boundary detection
+    Day 2-3: Implement and test 3-segment preservation
+  
+  Expected: 48/56 = 85.7%
+  Risk: MEDIUM (requires some refactoring)
+  Worth doing: YES (16% improvement over Phase 2)
+
+PHASE 3C: "Complete Optimization" (1 week, 60% confidence)
+  Week 3:
+    Day 1-2: Improve frustum-cylinder detection
+    Day 3:   Investigate and fix regression
+  
+  Expected: 49-50/56 = 87-89%
+  Risk: MEDIUM-HIGH (multiple interconnected changes)
+  Worth doing: MAYBE (20% improvement, but higher risk)
+
+
+TARGETING STRATEGY
+═════════════════════════════════════════════════════════════════════════════
+
+IF TIME-LIMITED (Target: 80%+):
+  1. Focus on sphere_cap-cylinder (4 tests)
+  2. Add noise smoothing (2 tests)
+  3. Don't touch 3-segment complexity
+  
+  Effort: 3-5 days
+  Confidence: 95%
+  Expected: 45/56 = 80.4%
+
+IF MODERATE TIME (Target: 85%+):
+  1. sphere_cap-cylinder fix
+  2. Noise smoothing
+  3. 3-segment boundary improvements
+  
+  Effort: 7-10 days
+  Confidence: 85%
+  Expected: 48/56 = 85.7%
+
+IF FULL PHASE 3 (Target: 88%+):
+  1. All above +
+  2. frustum-cylinder detection
+  3. Regression investigation
+  
+  Effort: 9-13 days
+  Confidence: 75%
+  Expected: 49-50/56 = 87-89%
+
+
+KEY METRICS FOR PHASE 3
+═════════════════════════════════════════════════════════════════════════════
+
+Success Criteria (by stage):
+  ├─ Phase 3A: Must achieve 45/56+ (80%)
+  ├─ Phase 3B: Should achieve 48/56+ (85%)
+  └─ Phase 3C: Nice to have 50/56+ (89%)
+
+Testing Requirements:
+  • Re-run full test suite after each fix
+  • Watch for regressions in previously passing tests
+  • Track improvements by shape type and size
+
+Performance Targets:
+  Single shapes:   95%+     (currently 87.5%, +2-3 tests possible)
+  2-segment:      75%+     (currently 66.7%, +4-5 tests possible)
+  3-segment:      50%+     (currently 25.0%, +3-4 tests possible)
+
+
+WHAT NOT TO FIX
+═════════════════════════════════════════════════════════════════════════════
+
+Abandon these without investigation:
+  ✗ Complex ML-based approach for size-specific parameters
+  ✗ Complete architectural redesign of segment detection
+  ✗ Parameter optimization for every size variation
+
+Keep as-is (acceptable performance):
+  ✓ Single sphere_cap: 87.5% (7/8) - good baseline
+  ✓ cone-frustum: 100% (4/4) - works perfectly
+  ✓ Large sizes (15mm): Generally solid except composites
+
+
+RESOURCE REQUIREMENTS
+═════════════════════════════════════════════════════════════════════════════
+
+Developer Time:
+  • Phase 3A: ~3-5 days (1 developer)
+  • Phase 3B: ~7-10 days (1 developer)
+  • Phase 3C: ~9-13 days (1-2 developers)
+
+Code Changes:
+  • sphere_cap fix: 1 module (~100 lines)
+  • Noise filtering: 1 module (~50 lines)
+  • 3-segment: 2-3 modules (~300 lines, architectural)
+  • frustum fix: 1 module (~100 lines)
+  • Total: ~550 lines of new/modified code
+
+Testing:
+  • 56 regression tests
+  • Expected 1-2 hours per phase after changes
+
+
+TIMELINE RECOMMENDATION
+═════════════════════════════════════════════════════════════════════════════
+
+CONSERVATIVE PATH (Guaranteed Success):
+  Week 1: Phase 3A fixes                    → 80%
+  Week 2: Phase 3B improvements             → 85%
+  Rest: Documentation and stabilization
+
+AGGRESSIVE PATH (Higher Risk):
+  Week 1: Phase 3A fixes                    → 80%
+  Week 2: Phase 3B + Phase 3C               → 87-89%
+  Rest: Regression hunting and optimization
+
+RECOMMENDED: Conservative path with Phase 3B
+  • Achieves strong results (85%)
+  • Manageable risk
+  • Time to handle unexpected issues
+  • Leaves slack for parameter tuning
+
+
+EXPECTED PHASE 3 OUTCOMES
+═════════════════════════════════════════════════════════════════════════════
+
+MINIMUM (if only Phase 3A completes):
+  ├─ Accuracy: 45/56 = 80.4%
+  ├─ Improvement: +6 from Phase 2 (11% gain)
+  └─ Effort: 3-5 days
+
+LIKELY (if Phase 3A + 3B complete):
+  ├─ Accuracy: 48/56 = 85.7%
+  ├─ Improvement: +9 from Phase 2 (16% gain)
+  └─ Effort: 7-10 days
+
+OPTIMISTIC (if all Phase 3 completes):
+  ├─ Accuracy: 49-50/56 = 87-89%
+  ├─ Improvement: +10-11 from Phase 2 (18-20% gain)
+  └─ Effort: 9-13 days
+
+THEORETICAL CEILING:
+  ├─ Accuracy: 51-52/56 = 91-93%
+  ├─ Improvement: +12-13 from Phase 2 (21-23% gain)
+  └─ Effort: 15+ days (requires architectural rework)
+
+
+NEXT STEPS
+═════════════════════════════════════════════════════════════════════════════
+
+1. IMMEDIATE:
+   ✓ Review this analysis
+   ✓ Decide on target accuracy for Phase 3
+   ✓ Prioritize which tier of improvements to pursue
+
+2. PREPARATION:
+   ✓ Create Phase 3 branch
+   ✓ Document baseline metrics
+   ✓ Set up performance tracking
+
+3. IMPLEMENTATION:
+   ✓ Start with sphere_cap-cylinder fix (highest ROI)
+   ✓ Add noise filtering next (low risk, 2 tests)
+   ✓ Plan for 3-segment improvements based on time available
+
+4. VALIDATION:
+   ✓ Run full test suite after each fix
+   ✓ Watch for regressions
+   ✓ Document improvements by category
+
+
+═════════════════════════════════════════════════════════════════════════════
+End of Analysis Report
+═════════════════════════════════════════════════════════════════════════════

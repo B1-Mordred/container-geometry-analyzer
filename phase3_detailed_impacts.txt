@@ -1,0 +1,388 @@
+================================================================================
+                    PHASE 3 DETAILED IMPACT ANALYSIS
+           Prioritized List of Failures & Expected Improvements
+================================================================================
+
+CRITICAL PRIORITIES (100% Failure Rate = Highest Confidence in Fix)
+─────────────────────────────────────────────────────────────────────────────
+
+1. sphere_cap-cylinder COMPOSITES (4/4 FAILING - 0% pass rate)
+   ════════════════════════════════════════════════════════════════════════════
+   
+   Tests Affected: 4 tests (7.1% of total)
+   All Under-Detected (expecting 2, detecting 1)
+   
+   a) composite_sphere_cap-cylinder_5mm_ideal.csv
+      Status: REGRESSED (passed in Phase 1, failed in Phase 2)
+      Size: 5mm (smallest diameter)
+      Error: 0% (ideal data)
+      Expected: 2 segments (sphere_cap, cylinder)
+      Detected: 1 segment (sphere_cap)
+      
+      Analysis: Merger logic is collapsing the boundary between sphere_cap
+      and cylinder. The spherical curve matches cylindrical curvature range.
+      
+   b) composite_sphere_cap-cylinder_10mm_2pct_error.csv
+      Status: FAILING
+      Size: 10mm
+      Error: 2% (noisy)
+      Expected: 2 segments
+      Detected: 1 segment
+      
+      Analysis: Same merging issue + noise makes boundary even weaker.
+      
+   c) composite_sphere_cap-cylinder_15mm_ideal.csv
+      Status: FAILING
+      Size: 15mm (largest diameter)
+      Error: 0% (ideal)
+      Expected: 2 segments
+      Detected: 1 segment
+      
+      Analysis: Size shouldn't matter if curvature logic is correct.
+      Suggests systematic threshold issue.
+      
+   d) composite_sphere_cap-cylinder_15mm_2pct_error.csv
+      Status: FAILING
+      Size: 15mm
+      Error: 2% (noisy)
+      Expected: 2 segments
+      Detected: 1 segment
+      
+      Analysis: Combined size + noise amplifies the core issue.
+   
+   ROOT CAUSE HYPOTHESIS:
+   The sphere_cap curvature range (0.4-0.6 mm^-1) overlaps with cylinder
+   (~0 mm^-1 in one direction). When merging adjacent segments, the system
+   sees sphere_cap's curvature as "continuous" with cylinder's flat side.
+   
+   FIX APPROACH:
+   • Implement Gaussian-based curvature classification instead of thresholds
+   • Use second derivative to distinguish sphere_cap bump from cylinder flat
+   • Add constraint: sphere_cap always has curved cap, cylinder always has
+     flat top when they meet
+   
+   CONFIDENCE LEVEL: HIGH (clear pattern, consistent across all 4 variants)
+   ESTIMATED EFFORT: 2-3 days
+   ESTIMATED IMPACT: +4 tests → 43/56 = 76.8%
+
+
+2. sphere_cap-cylinder-cone 3-SEGMENT COMPOSITES (4/4 FAILING - 0% pass rate)
+   ════════════════════════════════════════════════════════════════════════════
+   
+   Tests Affected: 4 tests (7.1% of total)
+   All Under-Detected (expecting 3, detecting 1-2 segments)
+   
+   a) composite3_sphere_cap-cylinder-cone_8mm_ideal.csv
+      Expected: 3 segments (sphere_cap, cylinder, cone)
+      Detected: 2 segments
+      Missing: 1 boundary (likely cylinder-cone junction)
+      
+   b) composite3_sphere_cap-cylinder-cone_8mm_2pct_error.csv
+      Expected: 3 segments
+      Detected: 2 segments
+      Missing: 1 boundary
+      
+   c) composite3_sphere_cap-cylinder-cone_10mm_ideal.csv
+      Expected: 3 segments
+      Detected: 1 segment (worst case)
+      Missing: 2 boundaries
+      
+   d) composite3_sphere_cap-cylinder-cone_10mm_2pct_error.csv
+      Expected: 3 segments
+      Detected: 2 segments
+      Missing: 1 boundary
+   
+   ROOT CAUSE HYPOTHESIS:
+   The boundary detection algorithm is designed to find transitions where
+   curvature changes significantly. With 3 segments:
+   • sphere_cap→cylinder: Clear transition (curved to flat)
+   • cylinder→cone: Subtle transition (flat to slightly curved)
+   
+   The cone's gradual radius change is too subtle when preceded by cylinder.
+   The algorithm merges cylinder+cone as "one gradually changing segment".
+   
+   FIX APPROACH:
+   • Implement multi-pass detection: pre-segment sphere_cap, then cone
+   • Use relative curvature change (not absolute) for cone detection
+   • Add constraint: cone always has radius change, cylinder always has constant
+   • Reduce merge-threshold distance when >2 segments expected
+   
+   CONFIDENCE LEVEL: MEDIUM-HIGH (clear issue, but architectural fix needed)
+   ESTIMATED EFFORT: 4-5 days (more complex than Priority 1)
+   ESTIMATED IMPACT: +3-4 tests → 46-47/56 = 82-84%
+
+
+HIGH PRIORITY (50-75% Failure Rate = Addressable Issues)
+─────────────────────────────────────────────────────────────────────────────
+
+3. Single CONE with 2% Error Noise (2/2 FAILING - 100% failure)
+   ════════════════════════════════════════════════════════════════════════════
+   
+   Tests Affected: 2 tests (3.6% of total)
+   All Over-Detected (expecting 1, detecting 2)
+   
+   a) cone_5mm_2pct_error.csv
+      Expected: 1 segment (cone)
+      Detected: 2 segments (cone + cylinder)
+      
+      Analysis: The noise adds variations to the radius curve that look
+      like a boundary. Algorithm splits what should be one smooth cone.
+      
+   b) cone_10mm_2pct_error.csv
+      Expected: 1 segment (cone)
+      Detected: 2 segments (cone + frustum)
+      
+      Analysis: Same issue - noise creates false boundary.
+   
+   ROOT CAUSE HYPOTHESIS:
+   The cone's radius increases smoothly. With 2% measurement noise,
+   some points appear to "plateau" (creating frustum-like pattern).
+   The boundary detector sees this as a real segment transition.
+   
+   FIX APPROACH:
+   • Add Gaussian smoothing filter before boundary detection (σ=0.1mm)
+   • Implement consistency check: cone should have monotonic radius change
+   • Require boundary confidence > 0.7 for noisy data (currently ~0.5)
+   
+   CONFIDENCE LEVEL: HIGH (isolated issue, clear pattern)
+   ESTIMATED EFFORT: 1-2 days
+   ESTIMATED IMPACT: +2 tests → 41-45/56 = 73-80%
+   
+   BONUS: Fixing this might also fix sphere_cap over-detection (1 test)
+
+
+4. frustum-cylinder COMPOSITES (3/4 FAILING - 75% failure)
+   ════════════════════════════════════════════════════════════════════════════
+   
+   Tests Affected: 3 tests (5.4% of total)
+   All Under-Detected (expecting 2, detecting 1)
+   
+   a) composite_frustum-cylinder_10mm_ideal.csv
+      Expected: 2 segments (frustum, cylinder)
+      Detected: 1 segment
+      Error: 0% (ideal data - still fails!)
+      
+      Analysis: Even with perfect data, can't distinguish frustum-cylinder
+      boundary. This suggests curvature-based detection isn't sufficient.
+      
+   b) composite_frustum-cylinder_15mm_ideal.csv
+      Expected: 2 segments
+      Detected: 1 segment
+      Error: 0%
+      
+      Analysis: Size independence confirms systematic issue, not noise.
+      
+   c) composite_frustum-cylinder_15mm_2pct_error.csv
+      Expected: 2 segments
+      Detected: 1 segment
+      Error: 2%
+   
+   ROOT CAUSE HYPOTHESIS:
+   Frustum curvature (0.1-0.3 mm^-1) is too similar to cylinder (≈0).
+   When they're adjacent, the system sees gradual curvature (frustum)
+   blending into flat (cylinder) as one continuous segment.
+   
+   Key difference from sphere_cap:
+   - sphere_cap has high curvature (0.4-0.6) = easier to distinguish
+   - frustum has moderate curvature = harder to separate from cylinder
+   
+   FIX APPROACH:
+   • Use radius change rate (dR/dZ) to distinguish frustum from cylinder
+   • Frustum has constant dR/dZ, cylinder has dR/dZ = 0
+   • Analyze both curvature AND radius trend
+   • Reduce merge threshold for frustum detection
+   
+   CONFIDENCE LEVEL: MEDIUM (clear pattern, but more complex fix)
+   ESTIMATED EFFORT: 2-3 days
+   ESTIMATED IMPACT: +1-2 tests → 40-42/56 = 71-75%
+   
+   Note: One test (composite_frustum-cylinder_10mm_2pct) PASSES.
+   Analyze why to understand the passing case!
+
+
+MEDIUM PRIORITY (25-50% Failure Rate = Specialized Fixes)
+─────────────────────────────────────────────────────────────────────────────
+
+5. cone-cylinder-frustum 3-SEGMENT COMPOSITES (2/4 FAILING - 50% failure)
+   ════════════════════════════════════════════════════════════════════════════
+   
+   Tests Affected: 2 tests (3.6% of total)
+   All Under-Detected (expecting 3, detecting 2)
+   
+   a) composite3_cone-cylinder-frustum_8mm_2pct_error.csv
+      Expected: 3 segments (cone, cylinder, frustum)
+      Detected: 2 segments
+      Missing: cylinder-frustum boundary
+      
+   b) composite3_cone-cylinder-frustum_10mm_ideal.csv
+      Expected: 3 segments
+      Detected: 2 segments
+      Missing: cylinder-frustum boundary
+      
+      Analysis: Same issue both times. The cylinder-frustum transition
+      is indistinguishable from noise/drift even in ideal data.
+   
+   ROOT CAUSE HYPOTHESIS:
+   - Cone→Cylinder: Clear transition (conical curve to flat)
+   - Cylinder→Frustum: Subtle transition (flat to slight curve)
+   
+   System detects cone+cylinder as 2 segments, but can't find the
+   frustum breakpoint because frustum's curve is too subtle.
+   
+   FIX APPROACH:
+   • Apply fix from Priority 4 (frustum detection improvement)
+   • Multi-pass approach: detect cone first, then look for frustum
+   • Lower frustum detection threshold once cone is identified
+   
+   CONFIDENCE LEVEL: MEDIUM (depends on Priority 4 fix)
+   ESTIMATED EFFORT: 1-2 days (after Priority 4 fix)
+   ESTIMATED IMPACT: +1-2 tests → 41-43/56 = 73-77%
+
+
+6. cone-cylinder COMPOSITE Regression (1/3 FAILING - 33% failure, but regressed)
+   ════════════════════════════════════════════════════════════════════════════
+   
+   Tests Affected: 1 test (1.8% of total)
+   Under-Detected (expecting 2, detecting 1)
+   REGRESSED from Phase 1 (passed before, failed now)
+   
+   a) composite_cone-cylinder_15mm_2pct_error.csv
+      Expected: 2 segments (cone, cylinder)
+      Detected: 1 segment (cone)
+      
+      Note: 15mm_ideal PASSES. This is size+noise specific.
+   
+   ROOT CAUSE HYPOTHESIS:
+   This was passing in Phase 1 and working in Phase 2 for ideal data.
+   The regression suggests Phase 2's selective detection is too
+   aggressive for this specific size+noise combination.
+   
+   Questions to investigate:
+   • What changed between Phase 1 and Phase 2?
+   • Why does 15mm_ideal pass but 15mm_2% fail?
+   • Is this a confidence threshold issue?
+   
+   FIX APPROACH:
+   • Understand Phase 1 vs Phase 2 differences
+   • May be related to selective_detection confidence parameter
+   • Might self-resolve if other fixes improve noise handling
+   
+   CONFIDENCE LEVEL: LOW (uncertain root cause, architectural question)
+   ESTIMATED EFFORT: 1-2 days investigation
+   ESTIMATED IMPACT: +1 test → 40/56 = 71%
+
+
+LOW PRIORITY (< 25% Failure Rate = Edge Cases)
+─────────────────────────────────────────────────────────────────────────────
+
+7. cone-cylinder-frustum 3-SEGMENT at 8mm (2/2 variants)
+   - 8mm_ideal: PASSES ✓
+   - 8mm_2%: FAILS (1/4 test, 2.5% of total)
+   → Only 1 failure, likely same cause as Priority 5
+   → Will be fixed by Priority 4+5 improvements
+
+
+8. Single SPHERE_CAP with 2% Error (1/8 FAILING - 12.5%)
+   - sphere_cap_10mm_2pct: Over-detected (expecting 1, detecting 3)
+   → Likely same cause as Priority 3 (cone over-detection)
+   → Will be fixed by noise handling improvements
+
+
+================================================================================
+                              CUMULATIVE IMPACT
+================================================================================
+
+PHASE 3 ROADMAP & EXPECTED IMPROVEMENTS:
+
+✓ FIX 1: sphere_cap-cylinder (Priority 1)
+  Fixes: 4 tests
+  Running Total: 39 + 4 = 43/56 (76.8%)
+  Effort: 2-3 days
+  
+✓ FIX 2: Single cone noise (Priority 3)
+  Fixes: 2 tests (+ potential 1 bonus from sphere_cap)
+  Running Total: 43 + 2 = 45/56 (80.4%)
+  Effort: 1-2 days (total so far: 3-5 days)
+  
+✓ FIX 3: 3-segment boundaries (Priority 2)
+  Fixes: 3-4 tests
+  Running Total: 45 + 3 = 48/56 (85.7%)
+  Effort: 4-5 days (total so far: 7-10 days)
+  
+✓ FIX 4: frustum-cylinder (Priority 4)
+  Fixes: 1-2 tests
+  Running Total: 48 + 1 = 49/56 (87.5%)
+  Effort: 2-3 days (total so far: 9-13 days)
+
+REALISTIC ESTIMATES:
+─────────────────────────────────────────────────────────────────────────────
+
+Scenario A: "Quick Fixes Only" (Fixes 1, 3, and bonus from 2)
+  Target: 45-46/56 = 80-82% accuracy
+  Effort: 3-5 days
+  Risk: Low (isolated fixes)
+  
+Scenario B: "Medium Depth" (Fixes 1, 2, 3)
+  Target: 46-48/56 = 82-85% accuracy
+  Effort: 7-10 days
+  Risk: Medium (some architectural changes needed)
+  
+Scenario C: "Complete Phase 3" (All fixes 1-4)
+  Target: 49-50/56 = 87-89% accuracy
+  Effort: 9-13 days
+  Risk: Medium (multiple interconnected changes)
+  
+Scenario D: "Plus Investigation" (All + understand regression)
+  Target: 50-51/56 = 89-91% accuracy
+  Effort: 11-15 days
+  Risk: Medium-High (requires deep analysis)
+
+
+WHAT WON'T BE FIXED:
+─────────────────────────────────────────────────────────────────────────────
+
+These are architectural limitations, not bugs:
+
+• sphere_cap in isolation detection: Works 87.5% (7/8) - acceptable
+  
+• Some 3-segment tests will remain hard without major refactoring
+  Example: composite3_sphere_cap-cylinder-cone at 8-10mm
+  Risk/Reward: Not worth 3+ days for 1-2 more tests
+
+• Size-dependent variations: Each size has different optimal parameters
+  Would need ML approach for full solution
+
+ESTIMATED CEILING: 90-92% (51-52/56 tests)
+  Beyond this requires complete architectural redesign
+
+
+================================================================================
+                        RECOMMENDED PHASE 3 PLAN
+================================================================================
+
+WEEK 1:
+  Day 1-2: sphere_cap-cylinder fix (Priority 1)
+  Day 2-3: Single cone noise fix (Priority 3)
+  Target: 45/56 = 80.4%
+
+WEEK 2:
+  Day 1: Multi-pass 3-segment boundary detection (Priority 2 design)
+  Day 2-3: Multi-pass implementation and testing
+  Target: 48/56 = 85.7%
+
+WEEK 3:
+  Day 1-2: frustum-cylinder detection (Priority 4)
+  Day 3: Regression investigation and fix
+  Target: 49-50/56 = 87-89%
+
+CONTINGENCY (if time permits):
+  • Parameter tuning for size-specific edge cases
+  • Investigate why some tests improved in Phase 2
+  • Document architectural limitations for Phase 4
+
+EXPECTED OUTCOME:
+  • Minimum: 45/56 (80%) - if only Quick Fixes
+  • Most likely: 48/56 (85%) - if Medium Depth completed
+  • Optimistic: 50/56 (89%) - if all fixes completed
+
+================================================================================
