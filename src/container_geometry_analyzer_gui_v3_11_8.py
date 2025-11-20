@@ -23,6 +23,17 @@ import tempfile
 from typing import Dict, List, Tuple, Optional
 import argparse
 
+# Priority 4: Stability-based multi-segment detection (foundation available for future use)
+try:
+    from stability_detection import (
+        predict_segment_count,
+        find_stability_transitions,
+        validate_all_transitions
+    )
+    HAS_STABILITY_DETECTION = True
+except ImportError:
+    HAS_STABILITY_DETECTION = False
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,

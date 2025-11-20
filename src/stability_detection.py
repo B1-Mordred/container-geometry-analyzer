@@ -290,15 +290,30 @@ def find_stability_transitions(area, heights, min_points=12, verbose=False):
     candidates = []
 
     # Find upward and downward jumps in stability
+    # Enhanced filtering: look for sustained changes, not just peaks
     for i in range(min_points, n - min_points):
-        # Look at local stability changes
-        left_stability = np.mean(stability[max(0, i-5):i])
-        right_stability = np.mean(stability[i:min(n, i+5)])
+        # Look at local stability changes with larger window
+        left_stability = np.mean(stability[max(0, i-7):i])
+        right_stability = np.mean(stability[i:min(n, i+7)])
 
         jump_magnitude = abs(right_stability - left_stability)
 
-        # Score the candidate
-        if jump_magnitude > threshold * 0.3 and abs(dS_dh[i]) > threshold * 0.5:
+        # Enhanced: Check if stability stays different (sustained change)
+        # This filters out transient peaks
+        if i > 12 and i < n - 12:
+            left_before = np.mean(stability[max(0, i-12):max(0, i-7)])
+            right_after = np.mean(stability[min(n, i+7):min(n, i+12)])
+
+            sustained_change = (
+                abs(left_before - left_stability) < jump_magnitude * 0.4 and
+                abs(right_stability - right_after) < jump_magnitude * 0.4
+            )
+        else:
+            sustained_change = True
+
+        # Score the candidate - CONSERVATIVE THRESHOLD for 3-segment focus
+        # Only use when high-confidence 3-segment prediction, so can be stricter
+        if jump_magnitude > threshold * 0.6 and abs(dS_dh[i]) > threshold * 0.5 and sustained_change:
             score = jump_magnitude * abs(dS_dh[i])
             candidates.append((i, score, jump_magnitude))
 
@@ -309,11 +324,13 @@ def find_stability_transitions(area, heights, min_points=12, verbose=False):
     candidates.sort(key=lambda x: x[1], reverse=True)
 
     # Select top transitions with spacing constraint
+    # MORE CONSERVATIVE: require larger spacing to avoid inflection detection
     final_transitions = [0]
+    min_transition_spacing = max(min_points * 2, int(n * 0.15))  # 15% of container or 2x min_points
 
     for idx, score, magnitude in candidates:
         # Ensure minimum spacing between transitions
-        if idx - final_transitions[-1] >= min_points:
+        if idx - final_transitions[-1] >= min_transition_spacing:
             final_transitions.append(idx)
 
             # For 3-segment, we only need 2 transitions (3 parts)
