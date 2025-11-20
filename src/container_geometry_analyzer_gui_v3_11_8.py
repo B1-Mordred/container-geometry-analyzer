@@ -95,7 +95,7 @@ DEFAULT_PARAMS = {
     'use_local_regression': True,  # Local polynomial regression for area computation
     'debug_transitions': False,  # Set to True to see detailed transition detection output
     # Priority 4: Selective Hybrid Routing (Phase 2 - Conservative Integration)
-    'use_selective_detection': False,  # Toggle for Phase 2 - Feature flag for instant rollback
+    'use_selective_detection': True,  # Toggle for Phase 2 - Feature flag for instant rollback (PHASE 2 DEPLOYED: +8.9% accuracy improvement)
     'selective_confidence_threshold': 'medium',  # 'high' or 'medium' - Confidence level required to use stability method (medium: +8.9% accuracy over baseline)
     'min_3segment_confidence': 'medium',  # Minimum confidence for 3-segment routing to stability method
 }
