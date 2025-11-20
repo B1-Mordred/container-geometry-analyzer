@@ -98,9 +98,9 @@ DEFAULT_PARAMS = {
     'use_selective_detection': True,  # Toggle for Phase 2 - Feature flag for instant rollback (PHASE 2 DEPLOYED: +8.9% accuracy improvement)
     'selective_confidence_threshold': 'medium',  # 'high' or 'medium' - Confidence level required to use stability method (medium: +8.9% accuracy over baseline)
     'min_3segment_confidence': 'medium',  # Minimum confidence for 3-segment routing to stability method
-    # Phase 3: Cone noise filtering
+    # Phase 3: Cone noise filtering (aggressive for real container measurement noise)
     'use_cone_smoothing': True,  # Enable Gaussian smoothing for cone profiles to reduce noise sensitivity
-    'cone_smoothing_sigma': 1.0,  # Gaussian smoothing sigma for cone noise filtering
+    'cone_smoothing_sigma': 1.5,  # Gaussian smoothing sigma (increased from 1.0 for real containers)
 }
 
 # Priority 1: Size-Adaptive Parameters for Improved Detection Accuracy
@@ -424,22 +424,42 @@ def classify_shape_by_radius_profile(area: np.ndarray, heights: np.ndarray = Non
         # Convert area to radius
         radius = np.sqrt(area / np.pi)
 
-        # === Phase 3: Improved profile smoothing for real containers ===
-        # Use Savitzky-Golay filter to preserve genuine curvature while removing noise
+        # === Phase 3: Aggressive smoothing for real containers with measurement noise ===
+        # Real containers show high-frequency oscillations from measurement artifacts
+        # Use multi-stage filtering: Savitzky-Golay (feature-preserving) + Gaussian (noise reduction)
         from scipy.ndimage import gaussian_filter1d
         from scipy.signal import savgol_filter
 
         # Create smoothed reference profile
-        if len(radius) >= 5:
+        if len(radius) >= 7:
             try:
-                # Use Savitzky-Golay for better feature preservation
-                window_length = max(5, min(11, len(radius) // 3 if len(radius) % 2 == 0 else len(radius) // 3 + 1))
+                # Stage 1: Aggressive Savitzky-Golay with larger window and low polynomial order
+                # Larger window removes more noise while preserving overall shape
+                # Polynomial order 2 avoids overfitting to noise
+                window_length = max(7, (len(radius) // 4) * 2 + 1)  # Larger window: len/4, ensure odd
+                window_length = min(window_length, len(radius) - 1)  # Can't exceed data length
                 if window_length % 2 == 0:
                     window_length -= 1  # Must be odd
-                radius_smooth_sg = savgol_filter(radius, window_length, 2)
-            except Exception:
-                # Fallback to Gaussian if Savitzky-Golay fails
-                radius_smooth_sg = gaussian_filter1d(radius, sigma=1.0)
+
+                try:
+                    radius_smooth_sg = savgol_filter(radius, window_length, polyorder=2)
+                except Exception:
+                    # If window too large, reduce it
+                    window_length = max(7, (len(radius) // 5) * 2 + 1)
+                    if window_length % 2 == 0:
+                        window_length -= 1
+                    radius_smooth_sg = savgol_filter(radius, window_length, polyorder=2)
+
+                # Stage 2: Additional Gaussian smoothing to further reduce high-frequency noise
+                # Sigma based on profile noise level (estimate from gradient)
+                gradient_rms = np.sqrt(np.mean(np.gradient(radius)**2))
+                sigma = max(0.5, min(2.0, gradient_rms * 0.5))  # Adaptive sigma
+                radius_smooth_sg = gaussian_filter1d(radius_smooth_sg, sigma=sigma)
+
+            except Exception as e:
+                # Fallback: Strong Gaussian smoothing
+                logger.debug(f"Savitzky-Golay failed, using Gaussian: {e}")
+                radius_smooth_sg = gaussian_filter1d(radius, sigma=1.5)
         else:
             radius_smooth_sg = radius.copy()
 
